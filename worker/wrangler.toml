@@ -13,9 +13,9 @@ bucket_name = "pdf-reader-pdfs"
 # then paste the returned id below (see README for the exact steps).
 [[kv_namespaces]]
 binding = "HL_KV"
-id = "<REPLACE_WITH_KV_ID>"
+id = "dc5d768ec1fd435197c6414dff6327ad"
 
 [vars]
 # Allowed CORS origin. '*' is fine for local dev; set it to the GitHub Pages
 # origin (e.g. https://<user>.github.io) for production.
-ALLOWED_ORIGIN = "*"
+ALLOWED_ORIGIN = "https://kyowanghwe.github.io"

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.wrangler/
+**/*.pdf
+.DS_Store
+.env*
+
+# TypeScript build artifacts
+*.tsbuildinfo
+web/vite.config.js
+web/vite.config.d.ts
