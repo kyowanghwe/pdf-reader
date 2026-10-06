@@ -1,10 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** Base URL of the Cloudflare Worker API (set at build time). */
-  readonly VITE_WORKER_URL?: string;
-  /** GitHub Pages base path (handled in vite.config.ts; declared for completeness). */
-  readonly VITE_BASE?: string;
+  // No VITE_WORKER_URL or VITE_BASE — the app is same-origin on Cloudflare Pages.
 }
 
 interface ImportMeta {

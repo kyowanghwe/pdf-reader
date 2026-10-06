@@ -1,0 +1,14 @@
+{
+  "name": "pdf-reader",
+  "private": true,
+  "scripts": {
+    "dev": "npx wrangler pages dev web/dist --local",
+    "typecheck:functions": "npx tsc --noEmit -p functions/tsconfig.json",
+    "typecheck:worker": "cd worker && npx tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240925.0",
+    "typescript": "^5.6.2",
+    "wrangler": "^3.78.0"
+  }
+}

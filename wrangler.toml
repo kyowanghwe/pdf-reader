@@ -1,0 +1,31 @@
+name = "pdf-reader"
+compatibility_date = "2024-09-23"
+
+# Pages: the built SPA ships from web/dist; the catch-all Pages Function at
+# functions/api/[[route]].ts handles /api/*.
+pages_build_output_dir = "web/dist"
+
+# R2 bucket holding the PDF files. Object key scheme: user/<identity>/<fileHash>.pdf
+# Create it once with:  npx wrangler r2 bucket create pdf-reader-pdfs
+[[r2_buckets]]
+binding = "PDF_BUCKET"
+bucket_name = "pdf-reader-pdfs"
+
+# KV namespace holding document metadata, highlights, and progress.
+# Create it once with:  npx wrangler kv namespace create HL_KV
+# then paste the returned id below (see README for the exact steps).
+[[kv_namespaces]]
+binding = "HL_KV"
+id = "dc5d768ec1fd435197c6414dff6327ad"
+
+[vars]
+# Cloudflare Access (Zero Trust) configuration — NON-SECRET.
+# Replace with your values from the Access dashboard (see README):
+#   TEAM_DOMAIN: your team domain, e.g. "myteam.cloudflareaccess.com"
+#   ACCESS_AUD:  the Application Audience (AUD) tag from the Access app config.
+TEAM_DOMAIN = "YOUR_TEAM.cloudflareaccess.com"
+ACCESS_AUD = "YOUR_ACCESS_AUD_TAG_HERE"
+# DEV_BYPASS defaults to "" (off) — production-safe. The local dev bypass is
+# enabled ONLY via a gitignored .dev.vars file (DEV_BYPASS=true), which
+# `wrangler pages dev` reads automatically. Never set this "true" here.
+DEV_BYPASS = ""

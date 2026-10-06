@@ -30,23 +30,15 @@ export interface NewHighlight {
   note?: string;
 }
 
-/** Fields that may be patched on an existing highlight. */
-export interface HighlightPatch {
-  color?: string;
-  note?: string;
-}
-
 /**
- * Stable store action interface (unchanged from FEAT-003). Now backed by the
- * Worker; consumers depend only on these names/signatures.
+ * Stable store action interface. Backed by the API (R2 + KV via api.ts);
+ * consumers depend only on these names/signatures.
  */
 export interface HighlightStore {
   /** All highlights for a document, in creation order. */
   getHighlights(fileHash: string): Highlight[];
   /** Create a highlight; returns the stored record (with id/createdAt). */
   addHighlight(input: NewHighlight): Highlight;
-  /** Patch color and/or note on an existing highlight. */
-  updateHighlight(id: string, patch: HighlightPatch): void;
   /** Delete a highlight by id. */
   removeHighlight(id: string): void;
   /** Save reading progress for a document. */
@@ -176,34 +168,6 @@ export function useHighlightStore(): {
     return record;
   }, []);
 
-  const updateHighlight = useCallback((id: string, patch: HighlightPatch): void => {
-    let fileHash: string | null = null;
-    setHighlights((prev) => {
-      const next: Record<string, Highlight[]> = {};
-      let changed = false;
-      for (const [hash, list] of Object.entries(prev)) {
-        const updated = list.map((h) => {
-          if (h.id !== id) return h;
-          changed = true;
-          fileHash = hash;
-          return {
-            ...h,
-            color: patch.color ?? h.color,
-            note: patch.note ?? h.note,
-          };
-        });
-        next[hash] = updated;
-      }
-      return changed ? next : prev;
-    });
-
-    if (fileHash) {
-      api
-        .updateHighlight(id, fileHash, patch)
-        .catch((err) => reportError('updateHighlight', err));
-    }
-  }, []);
-
   const removeHighlight = useCallback((id: string): void => {
     let fileHash: string | null = null;
     setHighlights((prev) => {
@@ -241,7 +205,6 @@ export function useHighlightStore(): {
     () => ({
       getHighlights,
       addHighlight,
-      updateHighlight,
       removeHighlight,
       setProgress: setProgressAction,
       getProgress,
@@ -250,7 +213,6 @@ export function useHighlightStore(): {
     [
       getHighlights,
       addHighlight,
-      updateHighlight,
       removeHighlight,
       setProgressAction,
       getProgress,

@@ -1,10 +1,15 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-// `base` must match the GitHub Pages path the app is served from.
-// For a project page at https://<user>.github.io/<repo>/ set VITE_BASE=/<repo>/.
-// For a user/org page or custom domain, leave it as '/'.
-// VITE_WORKER_URL is read by the frontend (src/api.ts) as the Worker API base URL.
+// Same-origin Cloudflare Pages hosting: `base` is always '/'. In local dev,
+// Vite proxies /api and /cdn-cgi to the local `wrangler pages dev` server
+// (127.0.0.1:8788) so the SPA and API share an origin.
 export default defineConfig({
-    base: process.env.VITE_BASE || '/',
+    base: '/',
     plugins: [react()],
+    server: {
+        proxy: {
+            '/api': 'http://127.0.0.1:8788',
+            '/cdn-cgi': 'http://127.0.0.1:8788',
+        },
+    },
 });

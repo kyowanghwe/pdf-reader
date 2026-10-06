@@ -1,6 +1,9 @@
+// Top controls — prev/next navigation + zoom. The page indicator has moved
+// to the bottom PageBar.
+
 interface ControlsProps {
-  currentPage: number;
   numPages: number;
+  currentPage: number;
   scale: number;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -9,8 +12,8 @@ interface ControlsProps {
 }
 
 export function Controls({
-  currentPage,
   numPages,
+  currentPage,
   scale,
   onZoomIn,
   onZoomOut,
@@ -23,9 +26,6 @@ export function Controls({
         <button type="button" onClick={onPrev} disabled={currentPage <= 1}>
           Prev
         </button>
-        <span className="pdf-page-indicator">
-          Page {currentPage} / {numPages}
-        </span>
         <button
           type="button"
           onClick={onNext}

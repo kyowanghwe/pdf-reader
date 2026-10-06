@@ -1,24 +1,27 @@
-// Worker API client.
+// API client — same-origin relative calls to /api/*.
 //
-// Every request carries the per-browser `X-User-Id` header (from userId.ts) and
-// is sent to the Worker base URL in `import.meta.env.VITE_WORKER_URL`. The route
-// shapes mirror the Worker contract (see worker/src/index.ts):
+// Auth is handled by the first-party Cloudflare Access session cookie (sent
+// automatically for same-origin requests). No X-User-Id header.
 //
+// Route contract (see worker/src/handler.ts):
+//
+//   GET    /api/whoami                            signed-in email
 //   POST   /api/pdfs                              upload (raw bytes + X-File-* headers)
 //   GET    /api/pdfs                              list my PDFs (Document[])
 //   GET    /api/pdfs/:fileHash                    stream PDF bytes (application/pdf)
 //   DELETE /api/pdfs/:fileHash                    delete PDF + highlights + progress
 //   GET    /api/documents/:fileHash/highlights    list highlights
 //   POST   /api/documents/:fileHash/highlights    create highlight
-//   PUT    /api/highlights/:id?fileHash=          edit color/note
 //   DELETE /api/highlights/:id?fileHash=          delete highlight
 //   PUT    /api/documents/:fileHash/progress       save progress
 
-import { getUserId } from './userId';
 import type { Document, Highlight, NormalizedRect, Progress } from './types';
 
-/** Worker API base URL, configured at build time via VITE_WORKER_URL. */
-const BASE_URL: string = (import.meta.env.VITE_WORKER_URL ?? '').replace(/\/$/, '');
+/**
+ * API base URL. Empty string because call sites already carry the `/api/`
+ * prefix, and the SPA is served same-origin from Cloudflare Pages.
+ */
+const BASE_URL = '';
 
 /** Fields the client sends when creating a highlight (server assigns id/createdAt). */
 export interface NewHighlightInput {
@@ -26,12 +29,6 @@ export interface NewHighlightInput {
   rects: NormalizedRect[];
   text: string;
   color: string;
-  note?: string;
-}
-
-/** Patchable fields on an existing highlight. */
-export interface HighlightPatch {
-  color?: string;
   note?: string;
 }
 
@@ -47,12 +44,11 @@ function url(path: string): string {
 }
 
 /**
- * fetch wrapper that always injects the X-User-Id header and merges any extra
- * headers/options. Throws on non-2xx responses with the server error message.
+ * fetch wrapper. Throws on non-2xx responses with the server error message.
+ * The Access session cookie is sent automatically (default same-origin behavior).
  */
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
-  headers.set('X-User-Id', getUserId());
 
   const res = await fetch(url(path), { ...init, headers });
   if (!res.ok) {
@@ -136,27 +132,7 @@ export async function createHighlight(
   return (await res.json()) as Highlight;
 }
 
-/**
- * Edit a highlight's color/note. The owning document's fileHash is required as a
- * query param because a highlight id alone is not addressable in KV.
- */
-export async function updateHighlight(
-  id: string,
-  fileHash: string,
-  patch: HighlightPatch,
-): Promise<Highlight> {
-  const res = await request(
-    `/api/highlights/${encodeURIComponent(id)}?fileHash=${encodeURIComponent(fileHash)}`,
-    {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
-    },
-  );
-  return (await res.json()) as Highlight;
-}
-
-/** Delete a highlight. fileHash is required (same reason as updateHighlight). */
+/** Delete a highlight. fileHash is required (same reason as before). */
 export async function deleteHighlight(id: string, fileHash: string): Promise<void> {
   await request(
     `/api/highlights/${encodeURIComponent(id)}?fileHash=${encodeURIComponent(fileHash)}`,

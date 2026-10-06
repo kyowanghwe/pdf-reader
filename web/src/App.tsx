@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePdfDocument } from './pdf/usePdfDocument';
 import { PdfViewer, pageContainerId } from './pdf/PdfViewer';
+import { OutlineSidebar } from './pdf/OutlineSidebar';
 import {
   HighlightStoreProvider,
   useHighlightStore,
 } from './highlights/store';
-import { Sidebar, HIGHLIGHT_COLORS } from './highlights/Sidebar';
+import { Sidebar } from './highlights/Sidebar';
+import { SelectionPopup, HIGHLIGHT_YELLOW } from './highlights/SelectionPopup';
 import { fromSelection } from './highlights/fromSelection';
 import { jumpToHighlight } from './highlights/jump';
 import { Library } from './library/Library';
 import { getPdf } from './api';
+import { getIdentity, getLogoutUrl, type UserIdentity } from './identity';
+import { getStoredTheme, setStoredTheme, type Theme } from './theme';
 import type { Document, Highlight, Progress } from './types';
 
 const MIN_SCALE = 0.5;
@@ -24,8 +28,13 @@ export default function App() {
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
   const [scale, setScale] = useState(1.25);
-  const [activeColor, setActiveColor] = useState<string>(HIGHLIGHT_COLORS[0]);
   const [resume, setResume] = useState<Progress | null>(null);
+
+  const [identity, setIdentity] = useState<UserIdentity | null>(null);
+  const [theme, setTheme] = useState<Theme>(getStoredTheme());
+  const [outlineOpen, setOutlineOpen] = useState(false);
+  const [highlightSidebarOpen, setHighlightSidebarOpen] = useState(true);
+  const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null);
 
   const { doc, numPages, error, loading } = usePdfDocument(data);
   const { store, highlights, progress } = useHighlightStore();
@@ -33,6 +42,42 @@ export default function App() {
   const docHighlights = fileHash ? highlights[fileHash] ?? [] : [];
 
   const progressTimer = useRef<number | null>(null);
+
+  // Fetch the signed-in identity once on mount.
+  useEffect(() => {
+    getIdentity().then(setIdentity);
+  }, []);
+
+  // Persist + apply theme.
+  const changeTheme = useCallback((next: Theme) => {
+    setTheme(next);
+    setStoredTheme(next);
+  }, []);
+
+  // Open the left outline sidebar automatically when the document has an outline.
+  useEffect(() => {
+    setOutlineOpen(false);
+    if (!doc) return;
+    let cancelled = false;
+    doc.getOutline().then((outline) => {
+      if (!cancelled && outline && outline.length > 0) setOutlineOpen(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [doc]);
+
+  // Dismiss the selection popup on an outside mousedown.
+  useEffect(() => {
+    if (!popupPos) return;
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('.selection-popup')) return;
+      setPopupPos(null);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [popupPos]);
 
   // Open a library document: stream its bytes from R2 and hydrate highlights +
   // progress. The Document's fileHash is the real hex SHA-256 computed at upload,
@@ -64,6 +109,7 @@ export default function App() {
     setFileName('');
     setResume(null);
     setOpenError(null);
+    setPopupPos(null);
   }, []);
 
   const zoomIn = useCallback(
@@ -75,11 +121,21 @@ export default function App() {
     [],
   );
 
-  // Selection -> highlight: on mouseup inside the viewer, create a highlight
-  // for each page the selection touched using the active color.
-  const handleSelection = useCallback(() => {
+  // Selection -> popup: on mouseup inside the viewer, show/dismiss the popup.
+  const onSelection = useCallback((rect: DOMRect | null) => {
+    if (!rect) {
+      setPopupPos(null);
+      return;
+    }
+    // Position the popup just above the selection, centered horizontally.
+    setPopupPos({ x: rect.left + rect.width / 2, y: Math.max(rect.top - 8, 8) });
+  }, []);
+
+  // Create yellow highlight(s) for the current selection.
+  const createHighlightFromSelection = useCallback(() => {
     if (!fileHash) return;
     const results = fromSelection();
+    setPopupPos(null);
     if (results.length === 0) return;
     let last: Highlight | null = null;
     for (const r of results) {
@@ -88,7 +144,7 @@ export default function App() {
         page: r.page,
         rects: r.rects,
         text: r.text,
-        color: activeColor,
+        color: HIGHLIGHT_YELLOW,
       });
     }
     window.getSelection()?.removeAllRanges();
@@ -102,11 +158,13 @@ export default function App() {
         page: last.page,
       });
     }
-  }, [fileHash, activeColor, store]);
+  }, [fileHash, store]);
 
-  // Progress (phase 4): debounce scroll/page changes and persist them.
+  // Progress (phase 4): debounce scroll/page changes and persist them. Also
+  // dismiss the selection popup on scroll.
   const handleScroll = useCallback(
     (info: { scrollTop: number; page: number }) => {
+      setPopupPos(null);
       if (!fileHash) return;
       if (progressTimer.current != null) {
         window.clearTimeout(progressTimer.current);
@@ -134,11 +192,6 @@ export default function App() {
   );
 
   const jump = useCallback((h: Highlight) => jumpToHighlight(h), []);
-
-  const recolor = useCallback(
-    (id: string, color: string) => store.updateHighlight(id, { color }),
-    [store],
-  );
   const remove = useCallback((id: string) => store.removeHighlight(id), [store]);
 
   // Restore saved position when the user chooses to resume.
@@ -165,7 +218,7 @@ export default function App() {
 
   return (
     <HighlightStoreProvider value={store}>
-      <div className="app">
+      <div className="app" data-theme={theme}>
         <header className="app-header">
           <h1>PDF Reader</h1>
           {data && (
@@ -179,6 +232,49 @@ export default function App() {
               Saved: page {savedProgress.page}
             </span>
           )}
+          <div className="app-header-right">
+            <div
+              className="theme-switcher"
+              role="radiogroup"
+              aria-label="Reading theme"
+            >
+              <button
+                type="button"
+                className={`theme-btn${theme === 'white' ? ' is-active' : ''}`}
+                aria-pressed={theme === 'white'}
+                onClick={() => changeTheme('white')}
+              >
+                White
+              </button>
+              <button
+                type="button"
+                className={`theme-btn${theme === 'green' ? ' is-active' : ''}`}
+                aria-pressed={theme === 'green'}
+                onClick={() => changeTheme('green')}
+              >
+                Green
+              </button>
+            </div>
+            {data && (
+              <button
+                type="button"
+                className="highlight-toggle"
+                aria-pressed={highlightSidebarOpen}
+                onClick={() => setHighlightSidebarOpen((o) => !o)}
+              >
+                {highlightSidebarOpen ? 'Hide highlights' : 'Show highlights'}
+              </button>
+            )}
+            {identity && (
+              <span className="app-user">
+                Signed in as {identity.email}
+                {' · '}
+                <a href={getLogoutUrl()} className="app-logout">
+                  Sign out
+                </a>
+              </span>
+            )}
+          </div>
         </header>
 
         <main className="app-main">
@@ -192,6 +288,11 @@ export default function App() {
 
           {doc && data && (
             <div className="app-reader">
+              <OutlineSidebar
+                doc={doc}
+                open={outlineOpen}
+                onToggle={() => setOutlineOpen((o) => !o)}
+              />
               <div className="app-viewer">
                 {resume && (
                   <div className="resume-banner">
@@ -212,20 +313,19 @@ export default function App() {
                   onZoomOut={zoomOut}
                   onScroll={handleScroll}
                   highlights={docHighlights}
-                  onSelection={handleSelection}
+                  onSelection={onSelection}
                 />
               </div>
-              <Sidebar
-                highlights={docHighlights}
-                activeColor={activeColor}
-                onActiveColorChange={setActiveColor}
-                onJump={jump}
-                onRecolor={recolor}
-                onDelete={remove}
-              />
+              {highlightSidebarOpen && (
+                <Sidebar highlights={docHighlights} onJump={jump} onDelete={remove} />
+              )}
             </div>
           )}
         </main>
+
+        {popupPos && (
+          <SelectionPopup pos={popupPos} onHighlight={createHighlightFromSelection} />
+        )}
       </div>
     </HighlightStoreProvider>
   );

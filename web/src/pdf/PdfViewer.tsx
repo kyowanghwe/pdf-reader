@@ -3,6 +3,7 @@ import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import { renderPage } from './renderPage';
 import { renderTextLayer } from './textLayer';
 import { Controls } from './Controls';
+import { PageBar } from './PageBar';
 import { Overlay } from '../highlights/Overlay';
 import type { Highlight } from '../types';
 
@@ -21,8 +22,11 @@ interface PdfViewerProps {
   onScroll?: (info: { scrollTop: number; page: number }) => void;
   /** All highlights for the current document, used to draw overlays per page. */
   highlights?: Highlight[];
-  /** Fired when text is selected inside a page (mouseup with a selection). */
-  onSelection?: () => void;
+  /**
+   * Fired on mouseup inside .pdf-scroll. Receives the selection's bounding
+   * rect (non-null for a valid non-empty selection) or null to dismiss.
+   */
+  onSelection?: (rect: DOMRect | null) => void;
 }
 
 interface PageProps {
@@ -149,7 +153,15 @@ export function PdfViewer({
   const handleMouseUp = () => {
     const selection = window.getSelection();
     if (selection && !selection.isCollapsed && selection.toString().trim()) {
-      onSelection?.();
+      try {
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        onSelection?.(rect);
+      } catch {
+        onSelection?.(null);
+      }
+    } else {
+      onSelection?.(null);
     }
   };
 
@@ -175,6 +187,7 @@ export function PdfViewer({
           />
         ))}
       </div>
+      <PageBar currentPage={currentPage} numPages={numPages} />
     </div>
   );
 }

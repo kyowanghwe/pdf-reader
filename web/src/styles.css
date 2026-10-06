@@ -22,7 +22,7 @@ body {
 .app-header {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 16px;
   padding: 12px 20px;
   background: #ffffff;
   border-bottom: 1px solid #e5e7eb;
@@ -32,6 +32,13 @@ body {
 .app-header h1 {
   font-size: 18px;
   margin: 0;
+}
+
+.app-header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .file-picker {
@@ -100,11 +107,21 @@ body {
   cursor: default;
 }
 
-.pdf-page-indicator,
 .pdf-zoom-indicator {
   font-variant-numeric: tabular-nums;
   min-width: 60px;
   text-align: center;
+}
+
+/* ---- Bottom page bar ---- */
+.pdf-page-bar {
+  text-align: center;
+  padding: 6px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  border-top: 1px solid #e5e7eb;
+  background: #ffffff;
+  flex: 0 0 auto;
 }
 
 .pdf-scroll {
@@ -173,7 +190,7 @@ body {
   top: 0;
 }
 
-/* ---- Reader layout (viewer + sidebar) ---- */
+/* ---- Reader layout (outline + viewer + sidebar) ---- */
 .app-reader {
   flex: 1 1 auto;
   min-height: 0;
@@ -188,7 +205,6 @@ body {
 }
 
 .app-progress {
-  margin-left: auto;
   font-size: 13px;
   color: #6b7280;
 }
@@ -244,7 +260,7 @@ body {
   }
 }
 
-/* ---- Sidebar ---- */
+/* ---- Right highlight sidebar ---- */
 .highlight-sidebar {
   flex: 0 0 300px;
   width: 300px;
@@ -257,12 +273,6 @@ body {
 .highlight-sidebar-header h2 {
   font-size: 15px;
   margin: 0 0 10px;
-}
-
-.color-picker {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
 }
 
 .color-swatch {
@@ -279,10 +289,6 @@ body {
   height: 14px;
   border-width: 1px;
   flex: 0 0 auto;
-}
-
-.color-swatch.is-active {
-  border-color: #111827;
 }
 
 .highlight-empty {
@@ -341,12 +347,6 @@ body {
   margin-top: 6px;
 }
 
-.highlight-recolor {
-  font: inherit;
-  font-size: 12px;
-  flex: 1 1 auto;
-}
-
 .highlight-delete {
   flex: 0 0 auto;
   width: 24px;
@@ -376,6 +376,196 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 40ch;
+}
+
+/* ---- Identity display ---- */
+.app-user {
+  font-size: 13px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.app-logout {
+  color: #6b7280;
+  text-decoration: underline;
+}
+
+.app-logout:hover {
+  color: #111827;
+}
+
+/* ---- Theme switcher ---- */
+.theme-switcher {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.theme-btn {
+  font: inherit;
+  font-size: 13px;
+  padding: 2px 10px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.theme-btn.is-active {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
+/* ---- Highlight sidebar toggle ---- */
+.highlight-toggle {
+  font: inherit;
+  font-size: 13px;
+  padding: 2px 10px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* ---- Left outline sidebar ---- */
+.outline-sidebar {
+  flex: 0 0 auto;
+  display: flex;
+  background: #ffffff;
+  border-right: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
+.outline-sidebar.is-open {
+  width: 260px;
+}
+
+.outline-toggle {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 100%;
+  min-height: 0;
+  border: none;
+  background: #f9fafb;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid #e5e7eb;
+}
+
+.outline-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.outline-heading {
+  font-size: 15px;
+  margin: 0 0 10px;
+}
+
+.outline-empty {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.outline-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.outline-list .outline-list {
+  padding-left: 16px;
+}
+
+.outline-node {
+  margin: 0;
+}
+
+.outline-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 4px;
+  color: #374151;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outline-item:hover {
+  background: #f3f4f6;
+}
+
+/* ---- Selection popup ---- */
+.selection-popup {
+  position: fixed;
+  z-index: 100;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 4px 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transform: translate(-50%, -100%);
+}
+
+.selection-popup-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid #d1d5db;
+  flex: 0 0 auto;
+}
+
+.selection-popup-btn {
+  font: inherit;
+  font-size: 13px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.selection-popup-btn:hover {
+  background: #f3f4f6;
+}
+
+/* ---- Green theme — eye-protection mode ---- */
+[data-theme="green"] body,
+[data-theme="green"] .pdf-scroll {
+  background: #e8f5e9;
+}
+
+/* Overlay a pale-green tint on the rendered page content.
+ * The PDF canvas is opaque white, so a background on .pdf-page is invisible.
+ * This ::after layer composites over the canvas with mix-blend-mode to produce
+ * a visible tint similar to WPS eye-protection mode. */
+[data-theme="green"] .pdf-page::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #c8e6c980;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: 3;
+}
+
+[data-theme="green"] .pdf-page-bar {
+  background: #e8f5e9;
 }
 
 /* ---- Library (entry screen) ---- */
