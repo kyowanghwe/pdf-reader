@@ -23,8 +23,8 @@ id = "dc5d768ec1fd435197c6414dff6327ad"
 # Replace with your values from the Access dashboard (see README):
 #   TEAM_DOMAIN: your team domain, e.g. "myteam.cloudflareaccess.com"
 #   ACCESS_AUD:  the Application Audience (AUD) tag from the Access app config.
-TEAM_DOMAIN = "YOUR_TEAM.cloudflareaccess.com"
-ACCESS_AUD = "YOUR_ACCESS_AUD_TAG_HERE"
+TEAM_DOMAIN = "steep-tree-b996.cloudflareaccess.com"
+ACCESS_AUD = "d6763eb12fbf4abecb161d05370e2f8c177f6496c9ce6f5b6d40a5521ff1a206"
 # DEV_BYPASS defaults to "" (off) — production-safe. The local dev bypass is
 # enabled ONLY via a gitignored .dev.vars file (DEV_BYPASS=true), which
 # `wrangler pages dev` reads automatically. Never set this "true" here.
