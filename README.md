@@ -59,9 +59,15 @@ Before deploying, configure Cloudflare Access to protect the Pages site:
    - Go to **Access → Applications → Add an application → Self-hosted**.
    - **Application name:** `PDF Reader` (or any name you like).
    - **Session duration:** 24 hours (or your preference).
-   - **Application domain:** set to your Cloudflare Pages domain, e.g.
-     `pdf-reader.pages.dev` (or your custom domain if you have one).
-     Leave the path empty to protect the entire site.
+   - **Application domain:** set to the **exact** Cloudflare Pages domain shown
+     in your Pages project's **Deployments** tab. Cloudflare often appends a
+     random suffix, so a project named `pdf-reader` may actually be served at
+     e.g. `pdf-reader-3kl.pages.dev` — use that exact domain (including the
+     suffix), not a guessed `pdf-reader.pages.dev`. Use a custom domain here
+     instead if you have one. Leave the path empty to protect the entire site.
+   - ⚠️ The Access application domain **must match the deployed site domain
+     exactly**. If they differ, login succeeds but `/api/*` tokens are rejected.
+     The same exact domain is also what you visit in the browser.
 
 3. **Create an Access policy:**
    - **Policy name:** `Allow me`
@@ -73,7 +79,15 @@ Before deploying, configure Cloudflare Access to protect the Pages site:
 4. **Obtain the Application Audience (AUD) tag and team domain:**
    - After creating the application, click on it in the list.
    - Copy the **Application Audience (AUD) Tag** — a long hex string.
-   - Your **team domain** is shown in the URL: `https://<team>.cloudflareaccess.com`.
+   - Your **team domain** is found in the Zero Trust dashboard under
+     **Settings** (Custom Pages / team domain), shaped like
+     `https://<team>.cloudflareaccess.com`.
+   - ⚠️ **Confirm the team domain before trusting it.** Do not guess the team
+     name from your account or team display name — it can be different. Open
+     `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` in a browser:
+     the correct team domain returns JSON with a `keys` array. If you instead
+     see an *"Unable to find your Access organization"* page, the team name is
+     wrong — fix it before continuing.
 
 5. **Update `wrangler.toml`:**
 
@@ -86,6 +100,21 @@ Before deploying, configure Cloudflare Access to protect the Pages site:
 
    Both `TEAM_DOMAIN` and `ACCESS_AUD` are **non-secret** — they can safely live
    in `wrangler.toml` and be committed to the repo.
+
+   > **Note — these vars are READ-ONLY in the dashboard.** Because `TEAM_DOMAIN`
+   > and `ACCESS_AUD` are defined in `wrangler.toml` `[vars]`, the Cloudflare
+   > Pages dashboard shows them as **read-only** (you cannot edit or delete them
+   > under *Settings → Variables and secrets*). The only correct way to change
+   > them is to edit `wrangler.toml` and **redeploy** — not via the dashboard.
+
+   > **Note — changes require a REDEPLOY.** An already-built deployment keeps its
+   > old vars. After changing `wrangler.toml` vars you must rebuild `web/` and
+   > deploy again for the new values to take effect:
+   >
+   > ```sh
+   > cd web && npm run build && cd ..
+   > npx wrangler pages deploy web/dist --project-name pdf-reader
+   > ```
 
 ---
 
@@ -181,6 +210,36 @@ identity: 'dev_at_local' }` for every request.
 (empty, off). The `.dev.vars` file is gitignored and never deployed. The only
 way to enable the bypass in production would be a deliberate, visible change
 to the Pages environment variables in the Cloudflare dashboard.
+
+---
+
+## Troubleshooting
+
+### "Invalid token" / 403 on `/api/*` after a successful login
+
+Login succeeds (you get through the Access screen) but every `/api/*` call
+returns 403. This means `TEAM_DOMAIN` or `ACCESS_AUD` is wrong — or still a
+placeholder — **in the deployed build**. Confirm the team domain with the
+`/cdn-cgi/access/certs` check above, fix the values in `wrangler.toml`, then
+**redeploy** (an already-built deployment keeps its old vars).
+
+The API returns distinct error strings; each points at a different cause:
+
+- **`Invalid token`** — bad or placeholder `TEAM_DOMAIN`, so the JWKS cert fetch
+  fails, or a signature / `kid` mismatch.
+- **`Invalid audience`** — `ACCESS_AUD` does not match the Access application's
+  AUD tag.
+- **`Invalid issuer`** — `TEAM_DOMAIN` mismatch even though the certs loaded.
+
+Also double-check that the Access application domain matches the **exact**
+deployed Pages domain (including any random suffix like `pdf-reader-3kl.pages.dev`).
+
+### Uploaded PDF does not appear immediately
+
+Cloudflare KV `list()` is **eventually consistent**, so a just-uploaded document
+is often not yet visible to an immediate list refresh. The app handles this by
+updating the library optimistically from the upload response, and a background
+refresh reconciles with the server list after a short delay.
 
 ---
 

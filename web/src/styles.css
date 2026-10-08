@@ -577,6 +577,20 @@ body {
   max-width: 720px;
   width: 100%;
   margin: 0 auto;
+  border: 2px dashed transparent;
+  border-radius: 10px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+/* Drag-and-drop feedback: dashed green border and pale-green highlight. */
+.library.drag-active {
+  border-color: #4caf50;
+  background: #e8f5e9;
+}
+
+.library-upload-hint {
+  font-size: 13px;
+  color: #6b7280;
 }
 
 .library-header {

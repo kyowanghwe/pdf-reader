@@ -28,6 +28,7 @@ export function Library({ onOpen }: LibraryProps) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(async () => {
@@ -49,20 +50,25 @@ export function Library({ onOpen }: LibraryProps) {
     void refresh();
   }, [refresh]);
 
-  const onUpload = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      // Allow re-selecting the same file later.
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      if (!file) return;
-
+  // Shared upload routine used by both the file input and drag-and-drop.
+  const uploadFile = useCallback(
+    async (file: File) => {
       setBusy(true);
       setError(null);
       try {
         const bytes = await file.arrayBuffer();
         const fileHash = await computeFileHash(bytes);
-        await uploadPdf(bytes, { fileHash, fileName: file.name, size: file.size });
-        await refresh();
+        const doc = await uploadPdf(bytes, { fileHash, fileName: file.name, size: file.size });
+        // Optimistic update: KV list() is eventually consistent, so the just-
+        // uploaded doc often isn't visible to an immediate refresh(). Merge the
+        // returned doc into local state right away (dedupe by fileHash), then
+        // fire a refresh so the server list eventually reconciles.
+        setDocs((prev) => {
+          const next = [doc, ...prev.filter((d) => d.fileHash !== doc.fileHash)];
+          next.sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
+          return next;
+        });
+        void refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Upload failed');
       } finally {
@@ -70,6 +76,47 @@ export function Library({ onOpen }: LibraryProps) {
       }
     },
     [refresh],
+  );
+
+  const onUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      // Allow re-selecting the same file later.
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (!file) return;
+      void uploadFile(file);
+    },
+    [uploadFile],
+  );
+
+  const isPdf = (file: File) =>
+    file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragActive(true);
+  }, []);
+
+  const onDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragActive(false);
+  }, []);
+
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragActive(false);
+      // Ignore drops while an upload is already in progress.
+      if (busy) return;
+      const file = e.dataTransfer.files?.[0];
+      if (!file) return;
+      if (!isPdf(file)) {
+        setError('Only PDF files are supported');
+        return;
+      }
+      void uploadFile(file);
+    },
+    [busy, uploadFile],
   );
 
   const onDelete = useCallback(
@@ -89,10 +136,16 @@ export function Library({ onOpen }: LibraryProps) {
   );
 
   return (
-    <section className="library">
+    <section
+      className={`library${dragActive ? ' drag-active' : ''}`}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
       <div className="library-header">
         <h2>Your PDFs</h2>
         <label className="library-upload">
+          <span className="library-upload-hint">Drag &amp; drop a PDF here, or</span>
           <input
             ref={fileInputRef}
             type="file"
