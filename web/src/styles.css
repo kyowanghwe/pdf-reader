@@ -270,9 +270,35 @@ body {
   padding: 16px;
 }
 
+.highlight-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
 .highlight-sidebar-header h2 {
   font-size: 15px;
-  margin: 0 0 10px;
+  margin: 0;
+}
+
+.highlight-sidebar-close {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  line-height: 1;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  color: #374151;
+}
+
+.highlight-sidebar-close:hover {
+  background: #e8f5e9;
+  border-color: #4caf50;
 }
 
 .color-swatch {
@@ -427,17 +453,40 @@ body {
   cursor: pointer;
 }
 
+.highlight-toggle.is-active {
+  background: #4caf50;
+  color: #fff;
+  border-color: #4caf50;
+}
+
 /* ---- Left outline sidebar ---- */
 .outline-sidebar {
   flex: 0 0 auto;
   display: flex;
+  position: relative;
   background: #ffffff;
   border-right: 1px solid #e5e7eb;
   overflow: hidden;
 }
 
-.outline-sidebar.is-open {
-  width: 260px;
+/* When open, width is driven by an inline style (persisted, drag-resizable). */
+
+/* Thin, easy-to-grab drag handle on the sidebar's right edge. */
+.outline-resize-handle {
+  flex: 0 0 auto;
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 4;
+}
+
+.outline-resize-handle:hover,
+.outline-resize-handle:active {
+  background: #4caf50;
 }
 
 .outline-toggle {
@@ -486,9 +535,40 @@ body {
   margin: 0;
 }
 
+.outline-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.outline-arrow {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #6b7280;
+  font-size: 9px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.outline-arrow:hover {
+  color: #111827;
+}
+
+.outline-arrow-spacer {
+  cursor: default;
+}
+
 .outline-item {
+  flex: 1 1 auto;
+  min-width: 0;
   display: block;
-  width: 100%;
   text-align: left;
   background: none;
   border: none;

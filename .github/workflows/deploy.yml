@@ -1,32 +1,42 @@
-name: Deploy web to GitHub Pages
+name: Deploy to Cloudflare Pages
 
-# Build the Vite app in web/ and publish it to GitHub Pages on every push to main.
-# Set the VITE_WORKER_URL and VITE_BASE repository variables (Settings ->
-# Secrets and variables -> Actions -> Variables) before the first deploy:
-#   VITE_WORKER_URL = https://pdf-reader-worker.<your-subdomain>.workers.dev
-#   VITE_BASE       = /<repo>/   (for a project page; '/' for a user/org page)
+# Build the Vite SPA in web/ and deploy it (plus the /api/* Pages Functions)
+# to Cloudflare Pages on every push to main that touches app code.
+#
+# One-time setup — add two repository SECRETS under
+# Settings -> Secrets and variables -> Actions -> Secrets:
+#   CLOUDFLARE_API_TOKEN   A Cloudflare API token with the "Cloudflare Pages: Edit"
+#                          permission (and access to the account below).
+#   CLOUDFLARE_ACCOUNT_ID  Your Cloudflare account ID (Dashboard -> Workers & Pages
+#                          -> Account details, or the hex id in the dashboard URL).
+#
+# The Access config vars (TEAM_DOMAIN, ACCESS_AUD) and the R2/KV bindings come
+# from wrangler.toml and are applied by the deploy — no need to set them here.
 
 on:
   push:
     branches: [main]
+    # Only run when something that affects the deployed app changes.
+    paths:
+      - "web/**"
+      - "functions/**"
+      - "worker/**"
+      - "wrangler.toml"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/deploy.yml"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-# Allow one concurrent deployment; don't cancel an in-progress run.
+# Cancel an in-flight deploy if a newer push arrives.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: cloudflare-pages-deploy
+  cancel-in-progress: true
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,27 +48,25 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Install dependencies
+      - name: Install web dependencies
+        run: npm ci
+        working-directory: web
+
+      # Typecheck gate — a broken build fails the Action here, before any deploy.
+      - name: Build web (tsc + vite)
+        run: npm run build
+        working-directory: web
+
+      # Typecheck the Pages Functions + Worker handler against the root config.
+      - name: Install root dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
-        env:
-          VITE_WORKER_URL: ${{ vars.VITE_WORKER_URL }}
-          VITE_BASE: ${{ vars.VITE_BASE }}
+      - name: Typecheck Pages Functions
+        run: npx tsc --noEmit -p functions/tsconfig.json
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
         with:
-          path: web/dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy web/dist --project-name pdf-reader

@@ -7,6 +7,7 @@ interface SidebarProps {
   highlights: Highlight[];
   onJump: (highlight: Highlight) => void;
   onDelete: (id: string) => void;
+  onClose: () => void;
 }
 
 function snippet(text: string, max = 80): string {
@@ -14,11 +15,20 @@ function snippet(text: string, max = 80): string {
   return trimmed.length > max ? `${trimmed.slice(0, max)}…` : trimmed;
 }
 
-export function Sidebar({ highlights, onJump, onDelete }: SidebarProps) {
+export function Sidebar({ highlights, onJump, onDelete, onClose }: SidebarProps) {
   return (
     <aside className="highlight-sidebar">
       <div className="highlight-sidebar-header">
         <h2>Highlights</h2>
+        <button
+          type="button"
+          className="highlight-sidebar-close"
+          onClick={onClose}
+          aria-label="Close highlights panel"
+          title="Close highlights panel"
+        >
+          ×
+        </button>
       </div>
 
       {highlights.length === 0 ? (

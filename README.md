@@ -139,13 +139,41 @@ Before deploying, configure Cloudflare Access to protect the Pages site:
 
 ## Deploy
 
-### Option A: GitHub Actions (recommended)
+### Option A: GitHub Actions — auto-deploy (recommended)
 
-1. Push this repo to GitHub.
-2. In your repo **Settings → Secrets and variables → Actions → Secrets**, add:
-   - `CLOUDFLARE_API_TOKEN` — a Cloudflare API token with Pages + R2 + KV permissions.
-   - `CLOUDFLARE_ACCOUNT_ID` — your Cloudflare account ID.
-3. Push to `main`. The workflow builds `web/` and runs `wrangler pages deploy`.
+Pushing to `main` automatically builds and deploys. The workflow lives at
+`.github/workflows/deploy.yml`.
+
+**One-time setup:**
+
+1. **Create a Cloudflare API token:** Dashboard → **My Profile → API Tokens →
+   Create Token**. Use the **"Edit Cloudflare Workers"** template, or a custom
+   token with the **Account → Cloudflare Pages → Edit** permission. Copy it
+   (shown only once).
+2. **Get your Account ID:** Dashboard → **Workers & Pages → Account details**
+   (or the hex id in the dashboard URL).
+3. **Add two repository secrets:** repo → **Settings → Secrets and variables →
+   Actions → Secrets → New repository secret**:
+   - `CLOUDFLARE_API_TOKEN` — the token from step 1.
+   - `CLOUDFLARE_ACCOUNT_ID` — the account id from step 2.
+4. **Push `.github/workflows/deploy.yml` and `wrangler.toml` to `main`.**
+
+**What the workflow does on every push to `main`** (only when `web/`,
+`functions/`, `worker/`, `wrangler.toml`, or the package/workflow files change):
+
+1. Builds `web/` (`tsc` + Vite) — a type or build error **fails the run here**.
+2. Typechecks the Pages Functions (`tsc --noEmit -p functions/tsconfig.json`).
+3. Only if both pass → `wrangler pages deploy web/dist --project-name pdf-reader`.
+
+So a broken build is caught by the gate and never deployed. Watch runs in the
+repo's **Actions** tab. You can also trigger a run manually from there
+(`workflow_dispatch`).
+
+> **Important:** the deploy reads `TEAM_DOMAIN`, `ACCESS_AUD`, and the R2/KV
+> bindings from the **committed** `wrangler.toml`. Make sure the real values
+> (not the `YOUR_TEAM...` placeholders) are committed, or every auto-deploy
+> ships broken auth (see Troubleshooting: "Invalid token"). These values are
+> non-secret and safe to commit.
 
 ### Option B: Manual deploy
 

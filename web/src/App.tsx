@@ -20,6 +20,7 @@ const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
 const SCALE_STEP = 0.25;
 const PROGRESS_DEBOUNCE_MS = 400;
+const HIGHLIGHTS_PANEL_KEY = 'pdfreader.highlightsPanelOpen';
 
 export default function App() {
   const [data, setData] = useState<ArrayBuffer | null>(null);
@@ -33,7 +34,9 @@ export default function App() {
   const [identity, setIdentity] = useState<UserIdentity | null>(null);
   const [theme, setTheme] = useState<Theme>(getStoredTheme());
   const [outlineOpen, setOutlineOpen] = useState(false);
-  const [highlightSidebarOpen, setHighlightSidebarOpen] = useState(true);
+  const [highlightSidebarOpen, setHighlightSidebarOpen] = useState(
+    () => localStorage.getItem(HIGHLIGHTS_PANEL_KEY) !== 'false',
+  );
   const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null);
 
   const { doc, numPages, error, loading } = usePdfDocument(data);
@@ -194,6 +197,15 @@ export default function App() {
   const jump = useCallback((h: Highlight) => jumpToHighlight(h), []);
   const remove = useCallback((id: string) => store.removeHighlight(id), [store]);
 
+  // Toggle the highlights panel and persist its open/closed state.
+  const toggleHighlightSidebar = useCallback(() => {
+    setHighlightSidebarOpen((o) => {
+      const next = !o;
+      localStorage.setItem(HIGHLIGHTS_PANEL_KEY, String(next));
+      return next;
+    });
+  }, []);
+
   // Restore saved position when the user chooses to resume.
   const doResume = useCallback(() => {
     if (!resume) return;
@@ -258,11 +270,11 @@ export default function App() {
             {data && (
               <button
                 type="button"
-                className="highlight-toggle"
+                className={`highlight-toggle${highlightSidebarOpen ? ' is-active' : ''}`}
                 aria-pressed={highlightSidebarOpen}
-                onClick={() => setHighlightSidebarOpen((o) => !o)}
+                onClick={toggleHighlightSidebar}
               >
-                {highlightSidebarOpen ? 'Hide highlights' : 'Show highlights'}
+                Highlights
               </button>
             )}
             {identity && (
@@ -317,7 +329,12 @@ export default function App() {
                 />
               </div>
               {highlightSidebarOpen && (
-                <Sidebar highlights={docHighlights} onJump={jump} onDelete={remove} />
+                <Sidebar
+                  highlights={docHighlights}
+                  onJump={jump}
+                  onDelete={remove}
+                  onClose={toggleHighlightSidebar}
+                />
               )}
             </div>
           )}
