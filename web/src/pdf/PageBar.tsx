@@ -1,4 +1,4 @@
-// Bottom page indicator — shows `currentPage / numPages`.
+// Bottom status bar showing the current page position within the document.
 
 interface PageBarProps {
   currentPage: number;
@@ -8,7 +8,7 @@ interface PageBarProps {
 export function PageBar({ currentPage, numPages }: PageBarProps) {
   return (
     <div className="pdf-page-bar">
-      {currentPage} / {numPages}
+      Page {currentPage} of {numPages || 1}
     </div>
   );
 }

@@ -1,57 +1,79 @@
-import { useEffect, useState } from 'react';
-import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { pdfjs } from './pdfSetup';
+// Load a PDF document with PDF.js, keyed by its content hash.
+//
+// Loading is URL-based (not a pre-downloaded ArrayBuffer): PDF.js fetches the
+// same-origin /api/pdfs/:fileHash endpoint and issues HTTP Range requests
+// itself, so only the bytes needed for the visible pages are downloaded. The
+// Cloudflare Access session cookie rides along automatically (first-party,
+// same-origin — no withCredentials needed).
 
-export interface UsePdfDocumentResult {
+import { useEffect, useState } from 'react';
+import * as pdfjsLib from 'pdfjs-dist';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
+import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
+// Point PDF.js at the bundled worker (Vite resolves the `?url` import to the
+// hashed asset path). Set once at module load.
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+
+/** 64 KB per range request — balances request count vs. wasted bandwidth. */
+const RANGE_CHUNK_SIZE = 65536;
+
+interface PdfDocumentState {
   doc: PDFDocumentProxy | null;
   numPages: number;
-  error: Error | null;
   loading: boolean;
+  error: Error | null;
 }
 
+const IDLE: PdfDocumentState = {
+  doc: null,
+  numPages: 0,
+  loading: false,
+  error: null,
+};
+
 /**
- * Loads a PDF from raw bytes. Pass a stable reference (e.g. memoized ArrayBuffer)
- * to avoid reloading on every render.
+ * Load the PDF identified by `fileHash` from the same-origin API. Returns the
+ * document proxy, page count, and loading/error state. Pass null/'' to reset to
+ * the idle state (e.g. when no document is open).
  */
-export function usePdfDocument(
-  data: ArrayBuffer | Uint8Array | null,
-): UsePdfDocumentResult {
-  const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
-  const [numPages, setNumPages] = useState(0);
-  const [error, setError] = useState<Error | null>(null);
-  const [loading, setLoading] = useState(false);
+export function usePdfDocument(fileHash: string | null): PdfDocumentState {
+  const [state, setState] = useState<PdfDocumentState>(IDLE);
 
   useEffect(() => {
-    if (!data) {
-      setDoc(null);
-      setNumPages(0);
-      setError(null);
+    if (!fileHash) {
+      setState(IDLE);
       return;
     }
 
     let cancelled = false;
-    // getDocument may transfer/detach the buffer; clone so callers keep their copy.
-    const bytes =
-      data instanceof Uint8Array ? data.slice() : new Uint8Array(data.slice(0));
-    const task = pdfjs.getDocument({ data: bytes });
+    setState({ doc: null, numPages: 0, loading: true, error: null });
 
-    setLoading(true);
-    setError(null);
+    const task = pdfjsLib.getDocument({
+      url: `/api/pdfs/${encodeURIComponent(fileHash)}`,
+      // Fetch only what the current page needs; never pre-fetch the whole file.
+      disableAutoFetch: true,
+      // Enable progressive streaming so the first page can paint early.
+      disableStream: false,
+      rangeChunkSize: RANGE_CHUNK_SIZE,
+    });
 
     task.promise.then(
-      (loaded) => {
+      (doc) => {
         if (cancelled) {
-          loaded.destroy();
+          doc.destroy();
           return;
         }
-        setDoc(loaded);
-        setNumPages(loaded.numPages);
-        setLoading(false);
+        setState({ doc, numPages: doc.numPages, loading: false, error: null });
       },
       (err: unknown) => {
         if (cancelled) return;
-        setError(err instanceof Error ? err : new Error(String(err)));
-        setLoading(false);
+        setState({
+          doc: null,
+          numPages: 0,
+          loading: false,
+          error: err instanceof Error ? err : new Error('Failed to load PDF'),
+        });
       },
     );
 
@@ -59,15 +81,7 @@ export function usePdfDocument(
       cancelled = true;
       task.destroy();
     };
-  }, [data]);
+  }, [fileHash]);
 
-  // Destroy the document when it changes or on unmount.
-  useEffect(() => {
-    return () => {
-      doc?.destroy();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc]);
-
-  return { doc, numPages, error, loading };
+  return state;
 }

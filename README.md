@@ -47,6 +47,31 @@ pdf-reader/
 - `TEAM_DOMAIN` and `ACCESS_AUD` are **non-secret** configuration vars (placed in
   `wrangler.toml` `[vars]`, not in secrets).
 
+## Performance
+
+Opening a PDF is fast because the app avoids two common bottlenecks:
+
+**Lazy / virtualized page rendering**
+Only the pages near the viewport are rendered (canvas + text layer). Pages outside
+the visible area ± 2-page buffer are kept as correctly-sized placeholder divs —
+so the scrollbar length, page positions, and jump-to-highlight all stay accurate
+without rendering the entire document up front. Pages are promoted to full renders
+by an `IntersectionObserver` as the user scrolls. Zooming re-renders visible pages
+in place.
+
+**HTTP range-request streaming**
+The Worker's `GET /api/pdfs/:fileHash` supports `Range` requests and returns
+`206 Partial Content` with exact `Content-Range` / `Content-Length` headers.
+PDF.js loads the PDF by same-origin URL with `disableAutoFetch: true` and a
+`rangeChunkSize`, so it fetches only the index and the byte ranges for the pages
+it needs — typically a few hundred KB for page 1 — rather than downloading the
+entire file. Repeat range fetches are cached with `Cache-Control: private, max-age=3600`.
+
+**One known limitation:** if a PDF is not linearized ("fast web view" optimized),
+PDF.js must fetch the cross-reference table before locating page 1, which can add
+a small delay on the very first open of a large, non-linearized file. This is a
+PDF format characteristic, not an app bug. See Troubleshooting below.
+
 ---
 
 ## Cloudflare Zero Trust / Access Setup
@@ -268,6 +293,16 @@ Cloudflare KV `list()` is **eventually consistent**, so a just-uploaded document
 is often not yet visible to an immediate list refresh. The app handles this by
 updating the library optimistically from the upload response, and a background
 refresh reconciles with the server list after a short delay.
+
+### First page still takes a moment on some large PDFs
+
+If a PDF is not **linearized** (also called "Fast Web View" in Adobe Acrobat /
+Optimize for web), PDF.js cannot locate page 1 until it has fetched and parsed
+the cross-reference table, which may require a few extra range requests on a very
+large file. This is a PDF format characteristic, not an app bug. To fix it,
+re-save the PDF with linearization enabled (Acrobat: File → Save As Other →
+Optimized PDF → check "Fast Web View"; or use `qpdf --linearize` on the
+command line) before uploading.
 
 ---
 
