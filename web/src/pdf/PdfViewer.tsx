@@ -9,10 +9,11 @@ import {
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import { renderPage } from './renderPage';
 import { renderTextLayer } from './textLayer';
-import { Controls } from './Controls';
-import { PageBar } from './PageBar';
+import { FloatTopBar } from './FloatTopBar';
+import { FloatBottomBar } from './FloatBottomBar';
 import { Overlay } from '../highlights/Overlay';
 import type { Highlight } from '../types';
+import type { Theme } from '../theme';
 
 /** DOM id for a page container, used by later jump-to-highlight logic. */
 export function pageContainerId(page: number): string {
@@ -32,8 +33,10 @@ interface PdfViewerProps {
   doc: PDFDocumentProxy;
   numPages: number;
   scale: number;
+  theme: Theme;
   onZoomIn: () => void;
   onZoomOut: () => void;
+  onToggleTheme: () => void;
   /** Fired on scroll with the scroll container's scrollTop and the current page. */
   onScroll?: (info: { scrollTop: number; page: number }) => void;
   /** All highlights for the current document, used to draw overlays per page. */
@@ -43,6 +46,8 @@ interface PdfViewerProps {
    * rect (non-null for a valid non-empty selection) or null to dismiss.
    */
   onSelection?: (rect: DOMRect | null) => void;
+  /** Called when the user clicks Highlight in the floating top toolbar. */
+  onHighlight?: () => void;
 }
 
 interface PageProps {
@@ -135,11 +140,14 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
       doc,
       numPages,
       scale,
+      theme,
       onZoomIn,
       onZoomOut,
+      onToggleTheme,
       onScroll,
       highlights = [],
       onSelection,
+      onHighlight = () => {},
     },
     ref,
   ) {
@@ -170,18 +178,16 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
       },
     }));
 
-    // Pre-fetch each page's dimensions at the current scale. Runs on mount and
-    // whenever the doc/scale/numPages change. getPage for viewport sizing does
-    // not decode image streams and is fast; cleanup() releases it immediately.
+    // Pre-fetch each page's dimensions at the current scale.
     useEffect(() => {
       let cancelled = false;
-      setPageDims([]); // clear stale dims immediately (e.g. on scale change)
+      setPageDims([]);
       (async () => {
         const dims = await Promise.all(
           Array.from({ length: numPages }, async (_, i) => {
             const p = await doc.getPage(i + 1);
             const vp = p.getViewport({ scale });
-            p.cleanup(); // only the viewport size was needed
+            p.cleanup();
             return { w: Math.floor(vp.width), h: Math.floor(vp.height) };
           }),
         );
@@ -199,7 +205,7 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
     }, [scale]);
 
     // IntersectionObserver: decide which pages get canvas + text based on
-    // viewport proximity. Set up once placeholders are in the DOM.
+    // viewport proximity.
     useEffect(() => {
       const el = scrollRef.current;
       if (!el || pageDims.length === 0) return;
@@ -217,15 +223,12 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
             toRender.add(n);
           }
         }
-        // Keep pages 1-3 rendered if nothing is visible yet (initial load).
         if (toRender.size === 0) {
           toRender.add(1);
           toRender.add(2);
           toRender.add(3);
         }
         setRenderedPages((prev) => {
-          // Skip the state update when the proximity set is unchanged to avoid a
-          // needless re-render on every scroll tick.
           if (prev.size === toRender.size && [...prev].every((p) => toRender.has(p))) {
             return prev;
           }
@@ -245,8 +248,6 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
         },
         {
           root: el,
-          // 300px lookahead: pre-render pages about to enter the viewport so
-          // the canvas is ready before the user actually sees the page.
           rootMargin: '300px 0px',
         },
       );
@@ -256,8 +257,6 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
       );
 
       return () => obs.disconnect();
-      // Only rebuild when the page count changes; scale changes reuse the same
-      // observed elements (handled by the reset effect above).
     }, [numPages, pageDims.length]);
 
     // Determine the page nearest the top of the viewport on scroll.
@@ -271,7 +270,6 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
         let active = 1;
         for (const page of pages) {
           const rect = page.getBoundingClientRect();
-          // First page whose bottom is still below the container top wins.
           if (rect.bottom - containerTop > 1) {
             active = Number(page.dataset.pageNumber) || 1;
             break;
@@ -317,15 +315,10 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
 
     return (
       <div className="pdf-viewer">
-        <Controls
-          currentPage={currentPage}
-          numPages={numPages}
-          scale={scale}
-          onZoomIn={onZoomIn}
-          onZoomOut={onZoomOut}
-          onPrev={() => goToPage(currentPage - 1)}
-          onNext={() => goToPage(currentPage + 1)}
-        />
+        {/* Floating top bar — overlaid on scroll area, contains annotation tools */}
+        <FloatTopBar onHighlight={onHighlight} />
+
+        {/* Main scrollable page area */}
         <div className="pdf-scroll" ref={scrollRef} onMouseUp={handleMouseUp}>
           {pageDims.length > 0
             ? pageDims.map((dims, i) => (
@@ -341,7 +334,20 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
               ))
             : null /* dims loading: App.tsx shows the loading indicator */}
         </div>
-        <PageBar currentPage={currentPage} numPages={numPages} />
+
+        {/* Floating bottom bar — overlaid on scroll area, nav + zoom + theme */}
+        <FloatBottomBar
+          currentPage={currentPage}
+          numPages={numPages}
+          scale={scale}
+          theme={theme}
+          onPrev={() => goToPage(currentPage - 1)}
+          onNext={() => goToPage(currentPage + 1)}
+          onZoomIn={onZoomIn}
+          onZoomOut={onZoomOut}
+          onGoToPage={goToPage}
+          onToggleTheme={onToggleTheme}
+        />
       </div>
     );
   },

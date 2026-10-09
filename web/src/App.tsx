@@ -58,13 +58,25 @@ export default function App() {
     setStoredTheme(next);
   }, []);
 
-  // Open the left outline sidebar automatically when the document has an outline.
+  // Toggle between White and Green theme — used by the floating bottom bar's
+  // eye button and by the header theme switcher (via changeTheme).
+  const toggleTheme = useCallback(() => {
+    changeTheme(theme === 'green' ? 'white' : 'green');
+  }, [theme, changeTheme]);
+
+  // Open the left outline sidebar automatically when the document has an
+  // outline — but only on desktop; on mobile the hamburger handles it.
   useEffect(() => {
     setOutlineOpen(false);
     if (!doc) return;
     let cancelled = false;
     doc.getOutline().then((outline) => {
-      if (!cancelled && outline && outline.length > 0) setOutlineOpen(true);
+      if (cancelled) return;
+      if (outline && outline.length > 0) {
+        if (!window.matchMedia('(max-width: 768px)').matches) {
+          setOutlineOpen(true);
+        }
+      }
     });
     return () => {
       cancelled = true;
@@ -83,11 +95,6 @@ export default function App() {
     return () => document.removeEventListener('mousedown', onDown);
   }, [popupPos]);
 
-  // Open a library document: hydrate highlights + progress, then set the
-  // fileHash so usePdfDocument streams the PDF by URL (HTTP range requests).
-  // No full download here — rendering starts near-instantly. The Document's
-  // fileHash is the real hex SHA-256 computed at upload, so it keys
-  // highlights/progress correctly.
   const openDocument = useCallback(
     async (document: Document) => {
       setOpening(true);
@@ -130,7 +137,6 @@ export default function App() {
       setPopupPos(null);
       return;
     }
-    // Position the popup just above the selection, centered horizontally.
     setPopupPos({ x: rect.left + rect.width / 2, y: Math.max(rect.top - 8, 8) });
   }, []);
 
@@ -151,7 +157,6 @@ export default function App() {
       });
     }
     window.getSelection()?.removeAllRanges();
-    // Track the newest highlight as part of progress.
     if (last) {
       const prev = store.getProgress(fileHash);
       store.setProgress({
@@ -163,8 +168,7 @@ export default function App() {
     }
   }, [fileHash, store]);
 
-  // Progress (phase 4): debounce scroll/page changes and persist them. Also
-  // dismiss the selection popup on scroll.
+  // Progress: debounce scroll/page changes and persist them.
   const handleScroll = useCallback(
     (info: { scrollTop: number; page: number }) => {
       setPopupPos(null);
@@ -195,11 +199,7 @@ export default function App() {
   );
 
   const jump = useCallback((h: Highlight) => {
-    // Ensure the target page is rendered before jump.ts queries for
-    // .highlight-box elements (which only exist once the canvas is painted).
     viewerRef.current?.ensurePageRendered(h.page);
-    // Give React one render cycle to flush the ensurePageRendered state update
-    // before jump.ts looks for the overlay boxes in the DOM.
     window.setTimeout(() => jumpToHighlight(h), 50);
   }, []);
   const remove = useCallback((id: string) => store.removeHighlight(id), [store]);
@@ -239,6 +239,18 @@ export default function App() {
     <HighlightStoreProvider value={store}>
       <div className="app" data-theme={theme}>
         <header className="app-header">
+          {/* Hamburger — mobile only (hidden via CSS on desktop) */}
+          {fileHash && (
+            <button
+              type="button"
+              className="app-menu-btn"
+              onClick={() => setOutlineOpen((o) => !o)}
+              aria-label={outlineOpen ? 'Close chapters' : 'Open chapters'}
+              aria-expanded={outlineOpen}
+            >
+              ☰
+            </button>
+          )}
           <h1>PDF Reader</h1>
           {fileHash && (
             <button type="button" className="app-back" onClick={closeDocument}>
@@ -307,11 +319,24 @@ export default function App() {
 
           {doc && fileHash && (
             <div className="app-reader">
+              {/* Backdrop overlay — shown only on mobile when a drawer is open */}
+              {(outlineOpen || highlightSidebarOpen) && (
+                <div
+                  className="mobile-drawer-backdrop"
+                  onClick={() => {
+                    if (outlineOpen) setOutlineOpen(false);
+                    else toggleHighlightSidebar();
+                  }}
+                  aria-hidden="true"
+                />
+              )}
+
               <OutlineSidebar
                 doc={doc}
                 open={outlineOpen}
                 onToggle={() => setOutlineOpen((o) => !o)}
               />
+
               <div className="app-viewer">
                 {resume && (
                   <div className="resume-banner">
@@ -329,13 +354,17 @@ export default function App() {
                   doc={doc}
                   numPages={numPages}
                   scale={scale}
+                  theme={theme}
                   onZoomIn={zoomIn}
                   onZoomOut={zoomOut}
+                  onToggleTheme={toggleTheme}
                   onScroll={handleScroll}
                   highlights={docHighlights}
                   onSelection={onSelection}
+                  onHighlight={createHighlightFromSelection}
                 />
               </div>
+
               {highlightSidebarOpen && (
                 <Sidebar
                   highlights={docHighlights}

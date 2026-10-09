@@ -1,5 +1,6 @@
 :root {
   --page-gap: 16px;
+  --float-bar-h: 40px;
 }
 
 * {
@@ -74,6 +75,7 @@ body {
   flex-direction: column;
   min-height: 0;
   flex: 1 1 auto;
+  position: relative; /* anchors the floating top/bottom bars */
 }
 
 .pdf-controls {
@@ -129,6 +131,10 @@ body {
   min-height: 0;
   overflow: auto;
   padding: var(--page-gap);
+  /* Extra top/bottom padding keeps the first and last pages from sliding
+     under the floating bars that overlay the scroll area. */
+  padding-top: calc(var(--float-bar-h) + var(--page-gap));
+  padding-bottom: calc(var(--float-bar-h) + var(--page-gap));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -769,4 +775,412 @@ body {
 .library-delete:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* ================================================================
+   FLOATING BARS (Feature 2)
+   Both bars are position: absolute within .pdf-viewer (position:
+   relative), so they overlay the scroll area without taking flex
+   space. They are semi-transparent and become more opaque on hover.
+   ================================================================ */
+
+.pdf-float-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background 0.15s ease;
+  min-height: var(--float-bar-h);
+}
+
+.pdf-float-bar:hover {
+  background: rgba(255, 255, 255, 0.97);
+}
+
+.pdf-float-bar--top {
+  top: 0;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8);
+}
+
+.pdf-float-bar--bottom {
+  bottom: 0;
+  border-top: 1px solid rgba(229, 231, 235, 0.8);
+}
+
+/* Collapsed state: just the expand chevron, thin strip */
+.pdf-float-bar--collapsed {
+  padding: 2px 10px;
+  min-height: 22px;
+}
+
+/* Groups inside a bar (e.g. nav group, zoom group) */
+.pdf-float-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Push right-side items to the far end */
+.pdf-float-spacer {
+  flex: 1 1 auto;
+}
+
+/* Buttons inside floating bars */
+.pdf-float-btn {
+  font: inherit;
+  font-size: 13px;
+  padding: 3px 10px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1.4;
+  white-space: nowrap;
+  transition: background 0.1s;
+}
+
+.pdf-float-btn:hover:not(:disabled) {
+  background: #e8f5e9;
+  border-color: #4caf50;
+}
+
+.pdf-float-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Square icon-only variant */
+.pdf-float-btn--icon {
+  padding: 3px 8px;
+  min-width: 30px;
+  text-align: center;
+}
+
+/* Active state — used for the eye-protection button when Green theme is on */
+.pdf-float-btn.is-active {
+  background: #4caf50;
+  color: #fff;
+  border-color: #4caf50;
+}
+
+.pdf-float-btn.is-active:hover {
+  background: #43a047;
+  border-color: #43a047;
+}
+
+/* Tooltip that appears next to the Highlight button */
+.pdf-float-tip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.pdf-float-tip {
+  position: absolute;
+  left: calc(100% + 6px);
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  font-size: 12px;
+  background: #374151;
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 30;
+}
+
+/* Zoom percentage label */
+.pdf-float-zoom {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  min-width: 42px;
+  text-align: center;
+}
+
+/* ================================================================
+   PAGE JUMP INPUT (Feature 1)
+   Appears inside the floating bottom bar when the page number is
+   clicked. No spin arrows, compact, no layout shift.
+   ================================================================ */
+
+/* Wrapper keeps the display-button and the "/ N" total right-aligned */
+.pdf-float-page {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* The clickable page number that opens the input */
+.pdf-page-display {
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  min-width: 32px;
+  text-align: center;
+  transition: border-color 0.1s, background 0.1s;
+}
+
+.pdf-page-display:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+/* The inline number input shown during editing */
+.pdf-page-input {
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  width: 52px;
+  padding: 2px 4px;
+  border: 1px solid #4caf50;
+  border-radius: 4px;
+  text-align: center;
+  outline: none;
+  /* Remove browser spin arrows */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.pdf-page-input::-webkit-inner-spin-button,
+.pdf-page-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.pdf-float-page-sep {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+/* ================================================================
+   HAMBURGER (mobile only — hidden on desktop via media query)
+   ================================================================ */
+.app-menu-btn {
+  display: none;
+  font-size: 20px;
+  padding: 4px 8px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 6px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.app-menu-btn:hover {
+  background: #f3f4f6;
+}
+
+/* ================================================================
+   MOBILE DRAWER BACKDROP
+   Rendered in App.tsx when a sidebar is open. display:none on
+   desktop; shown as a dimmed overlay on mobile.
+   ================================================================ */
+.mobile-drawer-backdrop {
+  display: none;
+}
+
+/* ================================================================
+   GREEN THEME — floating bars
+   ================================================================ */
+[data-theme="green"] .pdf-float-bar {
+  background: rgba(232, 245, 233, 0.9);
+  border-color: rgba(200, 230, 201, 0.8);
+}
+
+[data-theme="green"] .pdf-float-bar:hover {
+  background: rgba(232, 245, 233, 0.98);
+}
+
+[data-theme="green"] .pdf-float-btn:hover:not(:disabled) {
+  background: #c8e6c9;
+  border-color: #4caf50;
+}
+
+[data-theme="green"] .pdf-page-display:hover {
+  background: #c8e6c9;
+  border-color: #4caf50;
+}
+
+[data-theme="green"] .pdf-page-input {
+  background: #e8f5e9;
+}
+
+/* ================================================================
+   RESPONSIVE — MOBILE (max-width: 768px)
+   ================================================================ */
+@media (max-width: 768px) {
+  /* --- Prevent horizontal overflow on the whole page --- */
+  .app {
+    overflow-x: hidden;
+  }
+
+  /* --- Header: wrap, compact spacing --- */
+  .app-header {
+    padding: 8px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .app-header h1 {
+    font-size: 15px;
+  }
+
+  .app-filename {
+    max-width: 28vw;
+    font-size: 12px;
+  }
+
+  /* Hide verbose items on small screens */
+  .app-user,
+  .app-progress {
+    display: none;
+  }
+
+  .app-header-right {
+    gap: 6px;
+  }
+
+  .theme-btn {
+    padding: 2px 7px;
+    font-size: 12px;
+  }
+
+  .highlight-toggle {
+    font-size: 12px;
+    padding: 2px 7px;
+  }
+
+  /* Show the hamburger on mobile */
+  .app-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* --- Left outline sidebar — mobile drawer --- */
+  .outline-sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 200;
+    width: 280px !important;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.18);
+  }
+
+  .outline-sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  /* Hide the embedded ◀▶ toggle on mobile; hamburger handles open/close */
+  .outline-toggle {
+    display: none;
+  }
+
+  /* Disable drag-to-resize on mobile */
+  .outline-resize-handle {
+    display: none;
+  }
+
+  /* The outline content needs enough left padding (no toggle strip) */
+  .outline-content {
+    padding: 16px 12px;
+  }
+
+  /* --- Right highlights sidebar — mobile drawer --- */
+  .highlight-sidebar {
+    position: fixed !important;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 200;
+    width: 300px;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.18);
+  }
+
+  /* --- PDF viewer takes full width --- */
+  .app-reader {
+    overflow-x: hidden;
+  }
+
+  .app-viewer {
+    width: 100%;
+  }
+
+  /* --- Backdrop overlay behind open drawers --- */
+  .mobile-drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.42);
+    z-index: 150;
+  }
+
+  /* --- Floating bars: taller touch targets on mobile --- */
+  .pdf-float-bar {
+    min-height: 48px;
+    padding: 6px 10px;
+  }
+
+  .pdf-float-btn {
+    min-height: 40px;
+    min-width: 40px;
+    padding: 6px 10px;
+    font-size: 14px;
+  }
+
+  .pdf-float-btn--icon {
+    min-width: 40px;
+    padding: 6px 8px;
+  }
+
+  .pdf-float-zoom {
+    font-size: 14px;
+  }
+
+  .pdf-float-page-sep {
+    font-size: 14px;
+  }
+
+  .pdf-page-display {
+    font-size: 14px;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pdf-page-input {
+    font-size: 14px;
+    height: 36px;
+    width: 58px;
+  }
+
+  /* Hide top annotation bar by default on mobile (lower priority) */
+  .pdf-float-bar--top {
+    display: none;
+  }
+
+  /* Adjust pdf-scroll top padding since top bar is hidden on mobile */
+  .pdf-scroll {
+    padding-top: var(--page-gap);
+  }
 }
