@@ -158,6 +158,9 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
     // scroll space before any canvas renders so the scrollbar + page positions
     // are correct immediately.
     const [pageDims, setPageDims] = useState<{ w: number; h: number }[]>([]);
+    // Keep a ref in sync so goToPage interval callbacks always see the latest value.
+    const pageDimsRef = useRef<{ w: number; h: number }[]>([]);
+    useEffect(() => { pageDimsRef.current = pageDims; }, [pageDims]);
 
     // Which pages are actually painted (canvas + text layer). Start with the
     // first few so the top of the document shows immediately.
@@ -178,20 +181,40 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
       },
     }));
 
-    // Pre-fetch each page's dimensions at the current scale.
+    // Pre-fetch each page's dimensions at the current scale. Fills dims
+    // incrementally in batches so placeholder divs appear quickly and goToPage
+    // can scroll to any page as soon as its dim is known.
     useEffect(() => {
       let cancelled = false;
       setPageDims([]);
+      // Reset the ref immediately (synchronously) so goToPage polling correctly
+      // waits for the new dims — without this, pageDimsRef can show the old
+      // value while pageDims state is already [] (race condition on effect re-run).
+      pageDimsRef.current = [];
+      const BATCH = 20;
+      console.log('[pageDims] effect running | scale:', scale, '| numPages:', numPages);
       (async () => {
-        const dims = await Promise.all(
-          Array.from({ length: numPages }, async (_, i) => {
-            const p = await doc.getPage(i + 1);
-            const vp = p.getViewport({ scale });
-            p.cleanup();
-            return { w: Math.floor(vp.width), h: Math.floor(vp.height) };
-          }),
-        );
-        if (!cancelled) setPageDims(dims);
+        // Use a properly-filled array (no sparse slots) — new Array(n) creates
+        // sparse entries that render as zero-height divs when React batches updates.
+        const dims: { w: number; h: number }[] = [];
+        for (let start = 0; start < numPages; start += BATCH) {
+          if (cancelled) return;
+          const end = Math.min(start + BATCH, numPages);
+          const batch = await Promise.all(
+            Array.from({ length: end - start }, async (_, i) => {
+              const p = await doc.getPage(start + i + 1);
+              const vp = p.getViewport({ scale });
+              p.cleanup();
+              const dim = { w: Math.floor(vp.width), h: Math.floor(vp.height) };
+              if (start === 0 && i === 0) console.log('[pageDims] page 1 viewport:', dim, '| scale used:', scale);
+              return dim;
+            }),
+          );
+          if (cancelled) return;
+          for (const d of batch) dims.push(d);
+          // Publish a proper copy (no undefined slots) after each batch.
+          setPageDims([...dims]);
+        }
       })();
       return () => {
         cancelled = true;
@@ -286,20 +309,58 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
     const goToPage = (page: number) => {
       const clamped = Math.min(Math.max(page, 1), numPages);
       const el = scrollRef.current;
+      console.log('[goToPage] requested', page, '→ clamped', clamped, '| pageDimsRef.length', pageDimsRef.current.length, '| numPages', numPages, '| el', !!el);
       if (!el) return;
 
-      const target = document.getElementById(pageContainerId(clamped));
-      if (target) {
-        // Calculate exact scroll position from bounding rects — works on
-        // placeholder divs without needing the page to be rendered first.
-        // scrollIntoView is unreliable with lazy rendering and multiple
-        // scrollable ancestors (it scrolled to wrong page).
+      const doScroll = (attempt = 0) => {
+        const target = document.getElementById(pageContainerId(clamped));
+        const firstEl = el.querySelector('.pdf-page') as HTMLElement | null;
+        const nonZero = pageDimsRef.current.filter(d => d && d.h > 0).length;
+        const sumH = pageDimsRef.current.reduce((a, d) => a + (d?.h ?? 0), 0);
+        console.log('[goToPage] doScroll attempt', attempt, '| target?', !!target, '| el.scrollHeight', el.scrollHeight, '| el.clientHeight', el.clientHeight, '| non-zero dims:', nonZero, '| sumH:', sumH, '| page-1 offsetH:', firstEl?.offsetHeight);
+
+        // Guard: if the scroll container has no overflow, pageDims state was just
+        // reset (effect re-ran due to scale/doc change) and the DOM hasn't caught up
+        // yet — even if pageDimsRef shows 613. Retry until content appears.
+        if (!target || el.scrollHeight <= el.clientHeight + 10) {
+          if (attempt < 100) {
+            window.setTimeout(() => doScroll(attempt + 1), 50);
+          } else {
+            console.warn('[goToPage] gave up waiting for scroll content after 5s');
+          }
+          return;
+        }
+
+        // getBoundingClientRect gives correct viewport-relative positions regardless
+        // of offsetParent. .pdf-page's offsetParent is .pdf-viewer (position:relative),
+        // NOT .pdf-scroll, so the offsetTop chain approach was summing to the wrong
+        // ancestor. This approach works now that .pdf-scroll is properly constrained
+        // (min-height:0 on .app-viewer so overflow:auto kicks in).
         const containerRect = el.getBoundingClientRect();
         const targetRect = target.getBoundingClientRect();
         const newScrollTop = el.scrollTop + (targetRect.top - containerRect.top);
-        el.scrollTo({ top: newScrollTop, behavior: 'smooth' });
+        console.log('[goToPage] SCROLL | newScrollTop', newScrollTop, '| max', el.scrollHeight - el.clientHeight);
+        el.scrollTop = newScrollTop;
+        console.log('[goToPage] AFTER: el.scrollTop', el.scrollTop, '| expected ~', newScrollTop);
+        setCurrentPage(clamped);
+      };
+
+      // Trigger scroll — pageDimsRef.current is reset to [] synchronously when
+      // the pageDims effect re-runs, so this polling correctly waits for dims AND
+      // for the DOM to reflect them (the doScroll guard catches any remaining lag).
+      if (pageDimsRef.current.length >= clamped) {
+        console.log('[goToPage] dims ready, scrolling now');
+        doScroll();
+      } else {
+        console.log('[goToPage] dims not ready (have', pageDimsRef.current.length, 'need', clamped, ') — polling');
+        const id = window.setInterval(() => {
+          if (pageDimsRef.current.length >= clamped) {
+            window.clearInterval(id);
+            doScroll();
+          }
+        }, 50);
+        window.setTimeout(() => { window.clearInterval(id); console.warn('[goToPage] gave up waiting for dims after 5s'); }, 5000);
       }
-      setCurrentPage(clamped);
     };
 
     // Group highlights by page so each Page only re-renders with its own set.
