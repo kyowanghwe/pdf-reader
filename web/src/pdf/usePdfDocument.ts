@@ -1,22 +1,19 @@
 // Load a PDF document with PDF.js, keyed by its content hash.
 //
-// Loading is URL-based (not a pre-downloaded ArrayBuffer): PDF.js fetches the
-// same-origin /api/pdfs/:fileHash endpoint and issues HTTP Range requests
-// itself, so only the bytes needed for the visible pages are downloaded. The
-// Cloudflare Access session cookie rides along automatically (first-party,
-// same-origin — no withCredentials needed).
+// The full PDF is downloaded as an ArrayBuffer first, then passed to PDF.js
+// as in-memory data. This avoids HTTP Range request races and makes all
+// doc.getPage(n) calls instant (data already in memory), so pageDims loads
+// reliably and page jumps work correctly.
 
 import { useEffect, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { getPdf } from '../api';
 
 // Point PDF.js at the bundled worker (Vite resolves the `?url` import to the
 // hashed asset path). Set once at module load.
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
-
-/** 64 KB per range request — balances request count vs. wasted bandwidth. */
-const RANGE_CHUNK_SIZE = 65536;
 
 interface PdfDocumentState {
   doc: PDFDocumentProxy | null;
@@ -33,9 +30,11 @@ const IDLE: PdfDocumentState = {
 };
 
 /**
- * Load the PDF identified by `fileHash` from the same-origin API. Returns the
- * document proxy, page count, and loading/error state. Pass null/'' to reset to
- * the idle state (e.g. when no document is open).
+ * Load the PDF identified by `fileHash` from the same-origin API. Downloads
+ * the full file as an ArrayBuffer and passes it to PDF.js so all page data is
+ * instantly available in memory. Returns the document proxy, page count, and
+ * loading/error state. Pass null/'' to reset to the idle state (e.g. when no
+ * document is open).
  */
 export function usePdfDocument(fileHash: string | null): PdfDocumentState {
   const [state, setState] = useState<PdfDocumentState>(IDLE);
@@ -47,26 +46,26 @@ export function usePdfDocument(fileHash: string | null): PdfDocumentState {
     }
 
     let cancelled = false;
+    // Keep a reference so we can destroy the task if the component unmounts
+    // after the ArrayBuffer fetch resolves but before PDF.js finishes parsing.
+    let pdfTask: ReturnType<typeof pdfjsLib.getDocument> | null = null;
     setState({ doc: null, numPages: 0, loading: true, error: null });
 
-    const task = pdfjsLib.getDocument({
-      url: `/api/pdfs/${encodeURIComponent(fileHash)}`,
-      // Fetch only what the current page needs; never pre-fetch the whole file.
-      disableAutoFetch: true,
-      // Enable progressive streaming so the first page can paint early.
-      disableStream: false,
-      rangeChunkSize: RANGE_CHUNK_SIZE,
-    });
+    (async () => {
+      try {
+        const arrayBuffer = await getPdf(fileHash);
+        if (cancelled) return;
 
-    task.promise.then(
-      (doc) => {
+        pdfTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+        const doc = await pdfTask.promise;
+
         if (cancelled) {
           doc.destroy();
           return;
         }
+
         setState({ doc, numPages: doc.numPages, loading: false, error: null });
-      },
-      (err: unknown) => {
+      } catch (err: unknown) {
         if (cancelled) return;
         setState({
           doc: null,
@@ -74,12 +73,12 @@ export function usePdfDocument(fileHash: string | null): PdfDocumentState {
           loading: false,
           error: err instanceof Error ? err : new Error('Failed to load PDF'),
         });
-      },
-    );
+      }
+    })();
 
     return () => {
       cancelled = true;
-      task.destroy();
+      pdfTask?.destroy();
     };
   }, [fileHash]);
 

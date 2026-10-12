@@ -118,7 +118,8 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
     // ---- /api/pdfs/:fileHash ----
     if (parts[0] === 'api' && parts[1] === 'pdfs' && parts.length === 3) {
       const fileHash = decodeURIComponent(parts[2]);
-      if (method === 'GET') return getPdf(env, identity, fileHash);
+      if (method === 'GET' || method === 'HEAD')
+        return getPdf(request, env, identity, fileHash);
       if (method === 'DELETE') return deletePdf(env, identity, fileHash);
     }
 
@@ -218,14 +219,126 @@ async function listPdfs(env: Env, identity: string): Promise<Response> {
   return json(docs, 200);
 }
 
-async function getPdf(env: Env, identity: string, fileHash: string): Promise<Response> {
-  const obj = await env.PDF_BUCKET.get(r2Key(identity, fileHash));
-  if (!obj) {
-    return json({ error: 'PDF not found' }, 404);
+/**
+ * Parse a single `Range: bytes=start-end` header value against a known total
+ * file size. Handles "start-end", "start-" (open end), "-suffix" (last N bytes).
+ * Returns null when the range is unsatisfiable, malformed, or multi-range
+ * (PDF.js never sends multi-range; reject it cleanly with 416).
+ */
+function parseRangeHeader(
+  header: string,
+  total: number,
+): { start: number; end: number } | null {
+  if (!header.startsWith('bytes=')) return null;
+  const spec = header.slice('bytes='.length);
+  if (spec.includes(',')) return null; // multi-range: unsupported
+
+  const dashIdx = spec.indexOf('-');
+  if (dashIdx === -1) return null;
+  const sPart = spec.slice(0, dashIdx);
+  const ePart = spec.slice(dashIdx + 1);
+
+  let start: number;
+  let end: number;
+
+  if (sPart === '') {
+    // Suffix range: bytes=-N -> last N bytes
+    const suffix = Number(ePart);
+    if (!Number.isFinite(suffix) || suffix <= 0) return null;
+    start = Math.max(0, total - suffix);
+    end = total - 1;
+  } else {
+    start = Number(sPart);
+    end = ePart === '' ? total - 1 : Number(ePart);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+    end = Math.min(end, total - 1); // clamp to file size
   }
+
+  if (start < 0 || start > end || start >= total) return null;
+  return { start, end };
+}
+
+/**
+ * Serve a PDF's bytes, honoring HTTP Range requests so PDF.js can stream only
+ * the slices it needs (first-paint in a fraction of the full-download time).
+ *
+ * Cache-Control choice: `private` because PDFs are gated per-identity by
+ * Cloudflare Access and must never be cached by shared/CDN proxies. `max-age=3600`
+ * lets the browser reuse already-fetched ranges for an hour (e.g. scrolling back
+ * over pages already loaded) without re-hitting the Worker.
+ */
+async function getPdf(
+  req: Request,
+  env: Env,
+  identity: string,
+  fileHash: string,
+): Promise<Response> {
+  const key = r2Key(identity, fileHash);
+
+  // HEAD: metadata-only response for size pre-discovery.
+  if (req.method === 'HEAD') {
+    const meta = await env.PDF_BUCKET.head(key);
+    if (!meta) return json({ error: 'PDF not found' }, 404);
+    return new Response(null, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Length': String(meta.size),
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'private, max-age=3600',
+      },
+    });
+  }
+
+  const rangeHeader = req.headers.get('Range');
+
+  if (!rangeHeader) {
+    // No Range -> full 200. Include Accept-Ranges + Content-Length so the
+    // browser and PDF.js know future requests can use range requests.
+    const obj = await env.PDF_BUCKET.get(key);
+    if (!obj) return json({ error: 'PDF not found' }, 404);
+    return new Response(obj.body, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Length': String(obj.size),
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'private, max-age=3600',
+      },
+    });
+  }
+
+  // Range request: HEAD first for total size, then fetch the slice.
+  const meta = await env.PDF_BUCKET.head(key);
+  if (!meta) return json({ error: 'PDF not found' }, 404);
+  const total = meta.size;
+
+  const parsed = parseRangeHeader(rangeHeader, total);
+  if (!parsed) {
+    // Unsatisfiable / malformed -> 416 with the current size.
+    return new Response(null, {
+      status: 416,
+      headers: { 'Content-Range': `bytes */${total}` },
+    });
+  }
+
+  const { start, end } = parsed;
+  const length = end - start + 1; // inclusive range -> byte count
+
+  const obj = await env.PDF_BUCKET.get(key, {
+    range: { offset: start, length },
+  });
+  if (!obj) return json({ error: 'PDF not found' }, 404);
+
   return new Response(obj.body, {
-    status: 200,
-    headers: { 'Content-Type': 'application/pdf' },
+    status: 206,
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Range': `bytes ${start}-${end}/${total}`,
+      'Content-Length': String(length),
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'private, max-age=3600',
+    },
   });
 }
 

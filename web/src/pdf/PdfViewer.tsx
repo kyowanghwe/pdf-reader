@@ -153,6 +153,8 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
   ) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [currentPage, setCurrentPage] = useState(1);
+    // Timestamp until which handleScroll is suppressed after a programmatic jump.
+    const jumpUntilRef = useRef<number>(0);
 
     // Placeholder dimensions per page (CSS px) at the current scale. Reserves
     // scroll space before any canvas renders so the scrollbar + page positions
@@ -192,7 +194,6 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
       // value while pageDims state is already [] (race condition on effect re-run).
       pageDimsRef.current = [];
       const BATCH = 20;
-      console.log('[pageDims] effect running | scale:', scale, '| numPages:', numPages);
       (async () => {
         // Use a properly-filled array (no sparse slots) — new Array(n) creates
         // sparse entries that render as zero-height divs when React batches updates.
@@ -205,9 +206,7 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
               const p = await doc.getPage(start + i + 1);
               const vp = p.getViewport({ scale });
               p.cleanup();
-              const dim = { w: Math.floor(vp.width), h: Math.floor(vp.height) };
-              if (start === 0 && i === 0) console.log('[pageDims] page 1 viewport:', dim, '| scale used:', scale);
-              return dim;
+              return { w: Math.floor(vp.width), h: Math.floor(vp.height) };
             }),
           );
           if (cancelled) return;
@@ -283,83 +282,80 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
     }, [numPages, pageDims.length]);
 
     // Determine the page nearest the top of the viewport on scroll.
+    // Works for both .pdf-scroll scrolling (constrained layout) and window
+    // scrolling (unconstrained layout where the window is the scroll container).
     useLayoutEffect(() => {
       const el = scrollRef.current;
       if (!el) return;
 
-      const handleScroll = () => {
+      const detectPage = () => {
+        // Suppress page detection briefly after a programmatic jump so
+        // setCurrentPage(clamped) in goToPage isn't overridden.
+        if (Date.now() < jumpUntilRef.current) {
+          console.log('[detectPage] suppressed (jump in progress)');
+          return;
+        }
+
         const pages = el.querySelectorAll<HTMLElement>('.pdf-page');
-        const containerTop = el.getBoundingClientRect().top;
+        // Use the TOP of the viewport as the reference line for page detection.
+        // This works whether .pdf-scroll or the window is the scroll container.
+        const constrained = el.scrollHeight > el.clientHeight + 10;
+        const refY = constrained
+          ? el.getBoundingClientRect().top  // .pdf-scroll is the scroll container
+          : 0;                              // window is the scroll container
         let active = 1;
         for (const page of pages) {
           const rect = page.getBoundingClientRect();
-          if (rect.bottom - containerTop > 1) {
+          if (rect.bottom - refY > 1) {
             active = Number(page.dataset.pageNumber) || 1;
             break;
           }
         }
+        console.log(`[detectPage] constrained=${constrained} | refY=${refY} | active=${active} | el.scrollTop=${el.scrollTop} | window.scrollY=${window.scrollY}`);
         setCurrentPage(active);
-        onScroll?.({ scrollTop: el.scrollTop, page: active });
+        onScroll?.({ scrollTop: el.scrollTop || window.scrollY, page: active });
       };
 
-      el.addEventListener('scroll', handleScroll, { passive: true });
-      return () => el.removeEventListener('scroll', handleScroll);
+      el.addEventListener('scroll', detectPage, { passive: true });
+      window.addEventListener('scroll', detectPage, { passive: true });
+      return () => {
+        el.removeEventListener('scroll', detectPage);
+        window.removeEventListener('scroll', detectPage);
+      };
     }, [onScroll]);
 
     const goToPage = (page: number) => {
       const clamped = Math.min(Math.max(page, 1), numPages);
       const el = scrollRef.current;
-      console.log('[goToPage] requested', page, '→ clamped', clamped, '| pageDimsRef.length', pageDimsRef.current.length, '| numPages', numPages, '| el', !!el);
       if (!el) return;
 
       const doScroll = (attempt = 0) => {
         const target = document.getElementById(pageContainerId(clamped));
-        const firstEl = el.querySelector('.pdf-page') as HTMLElement | null;
-        const nonZero = pageDimsRef.current.filter(d => d && d.h > 0).length;
-        const sumH = pageDimsRef.current.reduce((a, d) => a + (d?.h ?? 0), 0);
-        console.log('[goToPage] doScroll attempt', attempt, '| target?', !!target, '| el.scrollHeight', el.scrollHeight, '| el.clientHeight', el.clientHeight, '| non-zero dims:', nonZero, '| sumH:', sumH, '| page-1 offsetH:', firstEl?.offsetHeight);
-
-        // Guard: if the scroll container has no overflow, pageDims state was just
-        // reset (effect re-ran due to scale/doc change) and the DOM hasn't caught up
-        // yet — even if pageDimsRef shows 613. Retry until content appears.
-        if (!target || el.scrollHeight <= el.clientHeight + 10) {
-          if (attempt < 100) {
-            window.setTimeout(() => doScroll(attempt + 1), 50);
-          } else {
-            console.warn('[goToPage] gave up waiting for scroll content after 5s');
-          }
+        console.log(`[jump] attempt ${attempt} | target? ${!!target} | pageDimsRef.length ${pageDimsRef.current.length} | el.scrollHeight ${el.scrollHeight} | el.clientHeight ${el.clientHeight}`);
+        if (!target) {
+          // Target not in DOM yet — wait for pageDims batch to render it.
+          if (attempt < 100) window.setTimeout(() => doScroll(attempt + 1), 50);
           return;
         }
-
-        // getBoundingClientRect gives correct viewport-relative positions regardless
-        // of offsetParent. .pdf-page's offsetParent is .pdf-viewer (position:relative),
-        // NOT .pdf-scroll, so the offsetTop chain approach was summing to the wrong
-        // ancestor. This approach works now that .pdf-scroll is properly constrained
-        // (min-height:0 on .app-viewer so overflow:auto kicks in).
-        const containerRect = el.getBoundingClientRect();
-        const targetRect = target.getBoundingClientRect();
-        const newScrollTop = el.scrollTop + (targetRect.top - containerRect.top);
-        console.log('[goToPage] SCROLL | newScrollTop', newScrollTop, '| max', el.scrollHeight - el.clientHeight);
-        el.scrollTop = newScrollTop;
-        console.log('[goToPage] AFTER: el.scrollTop', el.scrollTop, '| expected ~', newScrollTop);
+        // scrollIntoView finds the nearest scrollable ancestor automatically —
+        // works whether .pdf-scroll is constrained or the window is scrolling.
+        // instant avoids smooth-scroll interruption from React re-renders.
+        jumpUntilRef.current = Date.now() + 600; // suppress detectPage for 600ms
+        target.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'start' });
+        console.log(`[jump] scrollIntoView fired for page ${clamped} | el.scrollTop after: ${el.scrollTop} | window.scrollY after: ${window.scrollY}`);
         setCurrentPage(clamped);
       };
 
-      // Trigger scroll — pageDimsRef.current is reset to [] synchronously when
-      // the pageDims effect re-runs, so this polling correctly waits for dims AND
-      // for the DOM to reflect them (the doScroll guard catches any remaining lag).
       if (pageDimsRef.current.length >= clamped) {
-        console.log('[goToPage] dims ready, scrolling now');
         doScroll();
       } else {
-        console.log('[goToPage] dims not ready (have', pageDimsRef.current.length, 'need', clamped, ') — polling');
         const id = window.setInterval(() => {
           if (pageDimsRef.current.length >= clamped) {
             window.clearInterval(id);
             doScroll();
           }
         }, 50);
-        window.setTimeout(() => { window.clearInterval(id); console.warn('[goToPage] gave up waiting for dims after 5s'); }, 5000);
+        window.setTimeout(() => window.clearInterval(id), 5000);
       }
     };
 
