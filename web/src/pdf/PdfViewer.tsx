@@ -285,8 +285,20 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
 
     const goToPage = (page: number) => {
       const clamped = Math.min(Math.max(page, 1), numPages);
+      const el = scrollRef.current;
+      if (!el) return;
+
       const target = document.getElementById(pageContainerId(clamped));
-      target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (target) {
+        // Calculate exact scroll position from bounding rects — works on
+        // placeholder divs without needing the page to be rendered first.
+        // scrollIntoView is unreliable with lazy rendering and multiple
+        // scrollable ancestors (it scrolled to wrong page).
+        const containerRect = el.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const newScrollTop = el.scrollTop + (targetRect.top - containerRect.top);
+        el.scrollTo({ top: newScrollTop, behavior: 'smooth' });
+      }
       setCurrentPage(clamped);
     };
 
