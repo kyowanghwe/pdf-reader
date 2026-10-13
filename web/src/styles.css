@@ -613,6 +613,12 @@ body {
   transform: translate(-50%, -100%);
 }
 
+/* On mobile, popup appears below the selection so it doesn't overlap
+   with the browser's native selection toolbar (Copy/Share/etc.) */
+.selection-popup--below {
+  transform: translate(-50%, 8px);
+}
+
 .selection-popup-swatch {
   width: 14px;
   height: 14px;

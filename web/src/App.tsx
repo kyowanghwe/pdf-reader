@@ -36,7 +36,7 @@ export default function App() {
   const [highlightSidebarOpen, setHighlightSidebarOpen] = useState(
     () => localStorage.getItem(HIGHLIGHTS_PANEL_KEY) !== 'false',
   );
-  const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null);
+  const [popupPos, setPopupPos] = useState<{ x: number; y: number; below?: boolean } | null>(null);
 
   const { doc, numPages, error, loading } = usePdfDocument(fileHash || null);
   const { store, highlights, progress } = useHighlightStore();
@@ -147,7 +147,16 @@ export default function App() {
       setPopupPos(null);
       return;
     }
-    setPopupPos({ x: rect.left + rect.width / 2, y: Math.max(rect.top - 8, 8) });
+    // On mobile (touch device), position the popup BELOW the selection so it
+    // doesn't conflict with the browser's native selection toolbar (Copy/Share/etc.)
+    // which sits above the selection. On desktop, keep it above.
+    const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+    if (isTouchDevice) {
+      // Below the selection: y = bottom of selection + small gap
+      setPopupPos({ x: rect.left + rect.width / 2, y: rect.bottom + 8, below: true });
+    } else {
+      setPopupPos({ x: rect.left + rect.width / 2, y: Math.max(rect.top - 8, 8), below: false });
+    }
   }, []);
 
   // Create yellow highlight(s) for the current selection.
@@ -366,7 +375,7 @@ export default function App() {
         </main>
 
         {popupPos && (
-          <SelectionPopup pos={popupPos} onHighlight={createHighlightFromSelection} />
+          <SelectionPopup pos={popupPos} below={popupPos.below} onHighlight={createHighlightFromSelection} />
         )}
       </div>
     </HighlightStoreProvider>
