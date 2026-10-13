@@ -1222,3 +1222,708 @@ body {
     height: 18px;
   }
 }
+
+/* ================================================================
+   LIBRARY DASHBOARD (new design)
+   All classes prefixed .lib- to avoid collision with existing .library* rules.
+   ================================================================ */
+
+/* ---- Layout shell ---- */
+.lib-layout {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: #f8fafc;
+  position: relative;
+}
+
+/* ---- Left sidebar ---- */
+.lib-sidebar {
+  width: 256px;
+  flex: 0 0 256px;
+  background: #ffffff;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: transform 0.2s ease;
+}
+
+.lib-sidebar-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.lib-sidebar-footer {
+  padding: 16px;
+  border-top: 1px solid #e5e7eb;
+  flex: 0 0 auto;
+}
+
+.lib-sidebar-section {
+  margin-bottom: 24px;
+}
+
+.lib-sidebar-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #9ca3af;
+  padding: 0 12px;
+  margin: 0 0 8px;
+  display: block;
+}
+
+.lib-nav-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #4b5563;
+  text-align: left;
+  font-family: inherit;
+}
+
+.lib-nav-item:hover:not(.lib-nav-item--active) {
+  background: #f3f4f6;
+}
+
+.lib-nav-item--active {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.lib-nav-count {
+  margin-left: auto;
+  background: #dbeafe;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  line-height: 1.5;
+}
+
+.lib-storage-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.lib-storage-track {
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.lib-storage-fill {
+  height: 100%;
+  background: #2563eb;
+  border-radius: 9999px;
+}
+
+/* ---- Main content area ---- */
+.lib-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ---- Drop zone ---- */
+.lib-dropzone {
+  border: 2px dashed #d1d5db;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 32px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  user-select: none;
+}
+
+.lib-dropzone:hover,
+.lib-dropzone--active {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.1);
+}
+
+.lib-dropzone-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #eff6ff;
+  color: #3b82f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px;
+  transition: transform 0.2s;
+}
+
+.lib-dropzone:hover .lib-dropzone-icon {
+  transform: scale(1.1);
+}
+
+.lib-dropzone-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e293b;
+  margin: 0 0 4px;
+}
+
+.lib-dropzone-link {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.lib-dropzone-hint {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 0;
+}
+
+/* ---- Toolbar ---- */
+.lib-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.lib-toolbar-info {
+  min-width: 0;
+}
+
+.lib-toolbar-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 4px;
+  line-height: 1.2;
+}
+
+.lib-toolbar-count {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.lib-toolbar-controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---- Search ---- */
+.lib-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.lib-search-icon {
+  position: absolute;
+  left: 10px;
+  color: #9ca3af;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+
+.lib-search-input {
+  padding: 7px 12px 7px 32px;
+  background: #f1f5f9;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  width: 200px;
+  color: #0f172a;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.lib-search-input::placeholder {
+  color: #9ca3af;
+}
+
+.lib-search-input:focus {
+  background: #ffffff;
+  border-color: #3b82f6;
+}
+
+/* ---- View toggle ---- */
+.lib-view-toggle {
+  display: flex;
+  background: #e2e8f0;
+  border-radius: 12px;
+  padding: 4px;
+  gap: 2px;
+}
+
+.lib-view-btn {
+  border: none;
+  background: none;
+  padding: 5px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #64748b;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+}
+
+.lib-view-btn--active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+/* Mobile sidebar toggle — hidden on desktop */
+.lib-sidebar-toggle {
+  display: none;
+}
+
+/* ---- Grid view ---- */
+.lib-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+/* ---- Card ---- */
+.lib-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+
+.lib-card:hover {
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+}
+
+/* Card cover: gradient area at the top */
+.lib-card-cover {
+  height: 152px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 8 deterministic gradient palettes — index = parseInt(fileHash.slice(0,6), 16) % 8 */
+.lib-card-cover--0 { background: linear-gradient(135deg, #0f172a 0%, #312e81 100%); }
+.lib-card-cover--1 { background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); }
+.lib-card-cover--2 { background: linear-gradient(135deg, #0f172a 0%, #14532d 100%); }
+.lib-card-cover--3 { background: linear-gradient(135deg, #0f172a 0%, #3b0764 100%); }
+.lib-card-cover--4 { background: linear-gradient(135deg, #0f172a 0%, #78350f 100%); }
+.lib-card-cover--5 { background: linear-gradient(135deg, #0f172a 0%, #881337 100%); }
+.lib-card-cover--6 { background: linear-gradient(135deg, #0f172a 0%, #164e63 100%); }
+.lib-card-cover--7 { background: linear-gradient(135deg, #0f172a 0%, #334155 100%); }
+
+.lib-card-cover-top {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.lib-card-delete-btn {
+  background: rgba(15,23,42,0.35);
+  border: none;
+  color: rgba(255,255,255,0.55);
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.lib-card-delete-btn:hover {
+  background: rgba(239,68,68,0.75);
+  color: #ffffff;
+}
+
+.lib-card-delete-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.lib-card-cover-icon {
+  color: #93c5fd;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.lib-card-title {
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  margin: 0;
+}
+
+/* Card body: filename + progress badge */
+.lib-card-body {
+  padding: 14px 16px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lib-card-filename {
+  font-size: 12px;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+}
+
+/* Card footer: size + read button */
+.lib-card-footer {
+  padding: 10px 16px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+}
+
+.lib-card-size {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* ---- Read button ---- */
+.lib-read-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+
+.lib-read-btn:hover {
+  background: #1d4ed8;
+}
+
+/* ---- Progress / status badge ---- */
+.lib-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  width: fit-content;
+}
+
+.lib-badge--progress {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.lib-badge--not-started {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+/* ---- List view ---- */
+.lib-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lib-list-row {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  transition: box-shadow 0.15s;
+}
+
+.lib-list-row:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+/* Small colored icon squares for list rows (same 8 palette, class .lib-list-icon--N) */
+.lib-list-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #93c5fd;
+}
+
+.lib-list-icon--0 { background: linear-gradient(135deg, #0f172a, #312e81); }
+.lib-list-icon--1 { background: linear-gradient(135deg, #0f172a, #1e3a8a); }
+.lib-list-icon--2 { background: linear-gradient(135deg, #0f172a, #14532d); }
+.lib-list-icon--3 { background: linear-gradient(135deg, #0f172a, #3b0764); }
+.lib-list-icon--4 { background: linear-gradient(135deg, #0f172a, #78350f); }
+.lib-list-icon--5 { background: linear-gradient(135deg, #0f172a, #881337); }
+.lib-list-icon--6 { background: linear-gradient(135deg, #0f172a, #164e63); }
+.lib-list-icon--7 { background: linear-gradient(135deg, #0f172a, #334155); }
+
+.lib-list-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lib-list-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0 0 2px;
+}
+
+.lib-list-filename {
+  font-size: 12px;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+}
+
+.lib-list-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.lib-list-size {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.lib-list-delete {
+  background: none;
+  border: 1px solid #e2e8f0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.lib-list-delete:hover {
+  background: #fee2e2;
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.lib-list-delete:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ---- Empty state ---- */
+.lib-empty {
+  padding: 48px 24px;
+  text-align: center;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.lib-empty-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 12px;
+  opacity: 0.4;
+  color: #94a3b8;
+}
+
+.lib-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 4px;
+}
+
+.lib-empty-text {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* ---- Error / status ---- */
+.lib-error {
+  color: #b91c1c;
+  font-size: 14px;
+  padding: 8px 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  margin: 0;
+}
+
+.lib-status {
+  font-size: 14px;
+  color: #6b7280;
+  padding: 24px;
+  text-align: center;
+  margin: 0;
+}
+
+/* ---- Sidebar mobile overlay backdrop ---- */
+.lib-sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 299;
+}
+
+/* ================================================================
+   LIBRARY DASHBOARD — RESPONSIVE (max-width: 768px)
+   ================================================================ */
+@media (max-width: 768px) {
+  /* Sidebar: slide-in drawer on mobile */
+  .lib-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 300;
+    transform: translateX(-100%);
+    box-shadow: 4px 0 20px rgba(0,0,0,0.15);
+  }
+
+  .lib-sidebar--open {
+    transform: translateX(0);
+  }
+
+  /* Show the mobile sidebar toggle button */
+  .lib-sidebar-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #64748b;
+    padding: 0;
+    flex-shrink: 0;
+  }
+
+  .lib-main {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .lib-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .lib-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .lib-toolbar-controls {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .lib-search-input {
+    width: 130px;
+  }
+
+  .lib-dropzone {
+    padding: 20px 16px;
+  }
+
+  /* Hide file size column on mobile list view */
+  .lib-list-size {
+    display: none;
+  }
+
+  .lib-list-row {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .lib-list-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+}
