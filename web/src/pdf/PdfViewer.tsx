@@ -387,6 +387,47 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
       }
     };
 
+    // Mobile: use a debounced selectionchange listener so the popup only
+    // appears AFTER the user stops dragging the selection handles (not
+    // immediately after the long-press that selects one word).
+    // This also works on desktop as a fallback; handleMouseUp gives the
+    // instant response on desktop which feels better.
+    useEffect(() => {
+      let timerId: number | null = null;
+
+      const handleSelectionChange = () => {
+        if (timerId !== null) window.clearTimeout(timerId);
+        timerId = window.setTimeout(() => {
+          timerId = null;
+          const selection = window.getSelection();
+          if (
+            selection &&
+            !selection.isCollapsed &&
+            selection.toString().trim() &&
+            scrollRef.current &&
+            selection.anchorNode &&
+            scrollRef.current.contains(selection.anchorNode)
+          ) {
+            try {
+              const range = selection.getRangeAt(0);
+              const rect = range.getBoundingClientRect();
+              onSelection?.(rect);
+            } catch {
+              onSelection?.(null);
+            }
+          } else if (!selection || selection.isCollapsed || !selection.toString().trim()) {
+            onSelection?.(null);
+          }
+        }, 400);
+      };
+
+      document.addEventListener('selectionchange', handleSelectionChange);
+      return () => {
+        document.removeEventListener('selectionchange', handleSelectionChange);
+        if (timerId !== null) window.clearTimeout(timerId);
+      };
+    }, [onSelection]);
+
     return (
       <div className="pdf-viewer">
         {/* Floating top bar — overlaid on scroll area, contains annotation tools */}

@@ -10,29 +10,27 @@ const FLASH_MS = 1000;
 /**
  * Scroll a highlight into view and briefly flash its overlay box.
  *
- * Steps: find the page container, scroll it into view, compute the rect's pixel
- * position at the current rendered size, scroll so the rect is visible, then add
- * a CSS flash class to the overlay box for ~1s and remove it.
+ * Always scrolls via the .pdf-scroll container directly — never via
+ * scrollIntoView on the page element — to avoid triggering a window-level
+ * scroll that would push the app header off-screen on mobile.
  */
 export function jumpToHighlight(highlight: Highlight): void {
   const pageEl = document.getElementById(pageContainerId(highlight.page));
   if (!pageEl) return;
 
-  // Bring the page into view first.
-  pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-  // Then nudge so the first rect is visible, computed at the current size.
+  const scroller = pageEl.closest<HTMLElement>('.pdf-scroll');
   const firstRect = highlight.rects[0];
-  if (firstRect) {
+
+  if (scroller) {
+    // Compute intra-page rect offset when the canvas is already rendered.
     const renderedHeight = pageEl.getBoundingClientRect().height;
-    const scroller = pageEl.closest<HTMLElement>('.pdf-scroll');
-    if (scroller && renderedHeight > 0) {
-      const rectTopInPage = firstRect.y * renderedHeight;
-      // Target: a little above the rect so it is comfortably in view.
-      const target =
-        pageEl.offsetTop - scroller.offsetTop + rectTopInPage - 24;
-      scroller.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
-    }
+    const rectOffset =
+      firstRect && renderedHeight > 0 ? firstRect.y * renderedHeight : 0;
+    const target = pageEl.offsetTop - scroller.offsetTop + rectOffset - 24;
+    scroller.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+  } else {
+    // Fallback: no .pdf-scroll ancestor (should not happen in normal use).
+    pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // Flash every overlay box belonging to this highlight.

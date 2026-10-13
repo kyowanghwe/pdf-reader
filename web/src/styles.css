@@ -18,6 +18,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh; /* dynamic viewport: bottom bar stays visible on mobile */
 }
 
 .app-header {
@@ -1034,20 +1035,25 @@ body {
     overflow-x: hidden;
   }
 
-  /* --- Header: wrap, compact spacing --- */
+  /* --- Header: single row, compact --- */
   .app-header {
-    padding: 8px 12px;
-    gap: 8px;
-    flex-wrap: wrap;
+    padding: 6px 12px;
+    gap: 6px;
+    flex-wrap: nowrap; /* prevent two-row layout on mobile */
   }
 
   .app-header h1 {
-    font-size: 15px;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex-shrink: 1;
   }
 
+  /* Hide filename on mobile — it takes too much space; viewer shows context */
   .app-filename {
-    max-width: 28vw;
-    font-size: 12px;
+    display: none;
   }
 
   /* Hide verbose items on small screens */
@@ -1192,5 +1198,21 @@ body {
   /* Adjust pdf-scroll top padding since top bar is hidden on mobile */
   .pdf-scroll {
     padding-top: var(--page-gap);
+  }
+
+  /* Selection popup: larger tap target for the Highlight button on mobile */
+  .selection-popup {
+    padding: 6px 10px;
+  }
+
+  .selection-popup-btn {
+    min-height: 44px;
+    padding: 8px 12px;
+    font-size: 15px;
+  }
+
+  .selection-popup-swatch {
+    width: 18px;
+    height: 18px;
   }
 }

@@ -15,8 +15,10 @@ export function SelectionPopup({ pos, onHighlight }: SelectionPopupProps) {
     <div
       className="selection-popup"
       style={{ left: pos.x, top: pos.y }}
-      // Keep mousedown inside the popup from clearing the selection/popup.
+      // Keep mousedown (desktop) and touchstart (mobile) inside the popup
+      // from clearing the text selection before the Highlight button fires.
       onMouseDown={(e) => e.preventDefault()}
+      onTouchStart={(e) => e.preventDefault()}
     >
       <span
         className="selection-popup-swatch"

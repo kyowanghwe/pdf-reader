@@ -83,7 +83,8 @@ export default function App() {
     };
   }, [doc]);
 
-  // Dismiss the selection popup on an outside mousedown.
+  // Dismiss the selection popup on an outside mousedown (desktop) or
+  // touchstart (mobile — mousedown doesn't fire reliably on tap).
   useEffect(() => {
     if (!popupPos) return;
     const onDown = (e: MouseEvent) => {
@@ -91,8 +92,17 @@ export default function App() {
       if (target?.closest('.selection-popup')) return;
       setPopupPos(null);
     };
+    const onTouchStart = (e: TouchEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('.selection-popup')) return;
+      setPopupPos(null);
+    };
     document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
+    document.addEventListener('touchstart', onTouchStart, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('touchstart', onTouchStart);
+    };
   }, [popupPos]);
 
   const openDocument = useCallback(
