@@ -27,7 +27,7 @@ export default function App() {
   const [fileHash, setFileHash] = useState<string>('');
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
-  const [scale, setScale] = useState(1.25);
+  const [scale, setScale] = useState(() => window.innerWidth <= 768 ? 1.0 : 1.25);
   const [resume, setResume] = useState<Progress | null>(null);
 
   const [identity, setIdentity] = useState<UserIdentity | null>(null);
@@ -264,28 +264,6 @@ export default function App() {
             </span>
           )}
           <div className="app-header-right">
-            <div
-              className="theme-switcher"
-              role="radiogroup"
-              aria-label="Reading theme"
-            >
-              <button
-                type="button"
-                className={`theme-btn${theme === 'white' ? ' is-active' : ''}`}
-                aria-pressed={theme === 'white'}
-                onClick={() => changeTheme('white')}
-              >
-                White
-              </button>
-              <button
-                type="button"
-                className={`theme-btn${theme === 'green' ? ' is-active' : ''}`}
-                aria-pressed={theme === 'green'}
-                onClick={() => changeTheme('green')}
-              >
-                Green
-              </button>
-            </div>
             {fileHash && (
               <button
                 type="button"
