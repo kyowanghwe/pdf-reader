@@ -331,7 +331,12 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
 
       const doScroll = (attempt = 0) => {
         const target = document.getElementById(pageContainerId(clamped));
-        console.log(`[jump] attempt ${attempt} | target? ${!!target} | pageDimsRef.length ${pageDimsRef.current.length} | el.scrollHeight ${el.scrollHeight} | el.clientHeight ${el.clientHeight}`);
+        // Log actual DOM heights to diagnose why pages are tiny
+        const domPage1 = el.querySelector<HTMLElement>('[data-page-number="1"]');
+        const domPage433 = el.querySelector<HTMLElement>('[data-page-number="433"]');
+        console.log(`[jump] attempt ${attempt} | el.className: ${el.className} | el.scrollHeight ${el.scrollHeight} | el.clientHeight ${el.clientHeight}`);
+        console.log(`[jump] pageDimsRef[0].h: ${pageDimsRef.current[0]?.h} | pageDimsRef[432].h: ${pageDimsRef.current[432]?.h}`);
+        console.log(`[jump] DOM page-1 offsetHeight: ${domPage1?.offsetHeight} | style.height: ${domPage1?.style.height} | DOM page-433 offsetHeight: ${domPage433?.offsetHeight} | style.height: ${domPage433?.style.height}`);
         if (!target) {
           // Target not in DOM yet — wait for pageDims batch to render it.
           if (attempt < 100) window.setTimeout(() => doScroll(attempt + 1), 50);

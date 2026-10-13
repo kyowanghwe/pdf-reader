@@ -145,6 +145,9 @@ body {
   position: relative;
   background: #ffffff;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  /* Prevent flex shrinking — pages must keep their full height from pageDims.
+     Without this, a constrained .pdf-scroll would shrink pages to near-zero. */
+  flex-shrink: 0;
 }
 
 .pdf-canvas {
