@@ -9,6 +9,7 @@ import {
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import { renderPage } from './renderPage';
 import { renderTextLayer } from './textLayer';
+import { renderAnnotations } from './renderAnnotations';
 import { FloatTopBar } from './FloatTopBar';
 import { FloatBottomBar } from './FloatBottomBar';
 import { Overlay } from '../highlights/Overlay';
@@ -59,6 +60,8 @@ interface PageProps {
   dims: { w: number; h: number };
   /** true = render canvas + text layer; false = sized placeholder only. */
   rendered: boolean;
+  /** Called when a PDF internal link is clicked; 1-indexed page number. */
+  onGoToPage: (page: number) => void;
 }
 
 /**
@@ -66,11 +69,17 @@ interface PageProps {
  * scroll geometry is stable; only paints the canvas + text layer when
  * `rendered` is true (virtualization).
  */
-function Page({ doc, pageNumber, scale, highlights, dims, rendered }: PageProps) {
+function Page({ doc, pageNumber, scale, highlights, dims, rendered, onGoToPage }: PageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
+  const annotLayerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+
+  // Keep a stable ref to onGoToPage so the effect deps don't change on every
+  // PdfViewer render (goToPage is a new closure each time).
+  const onGoToPageRef = useRef(onGoToPage);
+  onGoToPageRef.current = onGoToPage;
 
   useEffect(() => {
     if (!rendered) {
@@ -90,7 +99,8 @@ function Page({ doc, pageNumber, scale, highlights, dims, rendered }: PageProps)
       const canvas = canvasRef.current;
       const container = containerRef.current;
       const textLayer = textLayerRef.current;
-      if (!canvas || !container || !textLayer) return;
+      const annotLayer = annotLayerRef.current;
+      if (!canvas || !container || !textLayer || !annotLayer) return;
 
       const viewport = await renderPage(page, scale, canvas);
       if (cancelled) return;
@@ -106,6 +116,12 @@ function Page({ doc, pageNumber, scale, highlights, dims, rendered }: PageProps)
 
       await renderTextLayer(page, viewport, textLayer);
       if (cancelled) return;
+
+      // Fire-and-forget: render link annotations as clickable overlays.
+      renderAnnotations(page, viewport, annotLayer, doc, (p) =>
+        onGoToPageRef.current(p),
+      ).catch(() => {});
+
       setSize({ w, h });
     })();
 
@@ -127,6 +143,7 @@ function Page({ doc, pageNumber, scale, highlights, dims, rendered }: PageProps)
         <>
           <canvas ref={canvasRef} className="pdf-canvas" />
           <div ref={textLayerRef} className="textLayer" />
+          <div ref={annotLayerRef} className="pdf-annot-layer" />
         </>
       )}
       <Overlay highlights={highlights} renderedWidth={size.w} renderedHeight={size.h} />
@@ -310,7 +327,6 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
             break;
           }
         }
-        console.log(`[detectPage] constrained=${constrained} | refY=${refY} | active=${active} | el.scrollTop=${el.scrollTop} | window.scrollY=${window.scrollY}`);
         setCurrentPage(active);
         onScroll?.({ scrollTop: el.scrollTop || window.scrollY, page: active });
       };
@@ -437,6 +453,7 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
                   highlights={byPage.get(i + 1) ?? []}
                   dims={dims}
                   rendered={renderedPages.has(i + 1)}
+                  onGoToPage={goToPage}
                 />
               ))
             : null /* dims loading: App.tsx shows the loading indicator */}

@@ -200,6 +200,25 @@ body {
   top: 0;
 }
 
+/* ---- PDF annotation link overlays ---- */
+/* Container: covers the full page, no pointer events so text selection works */
+.pdf-annot-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* Individual clickable link area: transparent, cursor pointer */
+.pdf-annot-link {
+  position: absolute;
+  cursor: pointer;
+  pointer-events: all;
+}
+
 /* ---- Reader layout (outline + viewer + sidebar) ---- */
 .app-reader {
   flex: 1 1 auto;
