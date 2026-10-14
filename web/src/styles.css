@@ -308,7 +308,7 @@ body {
 }
 
 .highlight-sidebar-close:hover {
-  background: #e8f5e9;
+  background: #c7eacc;
   border-color: #4caf50;
 }
 
@@ -644,7 +644,7 @@ body {
 /* ---- Green theme — eye-protection mode ---- */
 [data-theme="green"] body,
 [data-theme="green"] .pdf-scroll {
-  background: #e8f5e9;
+  background: #c7eacc;
 }
 
 /* Overlay a pale-green tint on the rendered page content.
@@ -655,14 +655,14 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: #c8e6c980;
+  background: #9ecba180;
   mix-blend-mode: multiply;
   pointer-events: none;
   z-index: 3;
 }
 
 [data-theme="green"] .pdf-page-bar {
-  background: #e8f5e9;
+  background: #c7eacc;
 }
 
 /* ---- Library (entry screen) ---- */
@@ -682,7 +682,7 @@ body {
 /* Drag-and-drop feedback: dashed green border and pale-green highlight. */
 .library.drag-active {
   border-color: #4caf50;
-  background: #e8f5e9;
+  background: #c7eacc;
 }
 
 .library-upload-hint {
@@ -858,7 +858,7 @@ body {
 }
 
 .pdf-float-btn:hover:not(:disabled) {
-  background: #e8f5e9;
+  background: #c7eacc;
   border-color: #4caf50;
 }
 
@@ -1019,17 +1019,17 @@ body {
 }
 
 [data-theme="green"] .pdf-float-btn:hover:not(:disabled) {
-  background: #c8e6c9;
+  background: #a8d5ae;
   border-color: #4caf50;
 }
 
 [data-theme="green"] .pdf-page-display:hover {
-  background: #c8e6c9;
+  background: #a8d5ae;
   border-color: #4caf50;
 }
 
 [data-theme="green"] .pdf-page-input {
-  background: #e8f5e9;
+  background: #c7eacc;
 }
 
 /* ================================================================
